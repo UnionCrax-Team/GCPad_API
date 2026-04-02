@@ -3,7 +3,6 @@ bin/
 obj/
 build/
 *.dll
-*.lib
 *.exe
 *.pdb
 *.ilk
@@ -32,3 +31,6 @@ Thumbs.db
 *~
 *.tmp
 *.bak
+scripts/
+vcpkg/
+include/SDL2

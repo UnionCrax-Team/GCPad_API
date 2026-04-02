@@ -26,10 +26,60 @@ target_include_directories(gcpad PUBLIC
 )
 
 # Link required libraries
-target_link_libraries(gcpad PRIVATE
-    hid.lib
-    setupapi.lib
-)
+# Include HID, SetupAPI, XInput, DirectInput, and SDL2 imports
+if(WIN32)
+    # Add local libs directory as fallback so the project can build from copied .lib files
+    link_directories("${CMAKE_SOURCE_DIR}/libs")
+
+    find_library(XINPUT_LIB NAMES xinput1_4 xinput9_1_0 PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
+    if(NOT XINPUT_LIB)
+        find_library(XINPUT_LIB NAMES xinput1_4 xinput9_1_0)
+    endif()
+
+    find_library(DINPUT_LIB NAMES dinput8 PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
+    if(NOT DINPUT_LIB)
+        find_library(DINPUT_LIB NAMES dinput8)
+    endif()
+
+    find_library(DXGUID_LIB NAMES dxguid PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
+    if(NOT DXGUID_LIB)
+        find_library(DXGUID_LIB NAMES dxguid)
+    endif()
+
+    set(GCPAD_BASE_LIBS hid setupapi)
+
+    if(XINPUT_LIB)
+        list(APPEND GCPAD_BASE_LIBS ${XINPUT_LIB})
+    else()
+        message(WARNING "XInput library not found (xinput1_4 / xinput9_1_0). Please place the .lib into libs/ or install Windows SDK.")
+    endif()
+
+    if(DINPUT_LIB)
+        list(APPEND GCPAD_BASE_LIBS ${DINPUT_LIB})
+    else()
+        message(WARNING "DirectInput library not found (dinput8). Please place the .lib into libs/ or install Windows SDK.")
+    endif()
+
+    if(DXGUID_LIB)
+        list(APPEND GCPAD_BASE_LIBS ${DXGUID_LIB})
+    else()
+        message(WARNING "dxguid library not found. Please place the .lib into libs/ or install Windows SDK.")
+    endif()
+
+    target_link_libraries(gcpad PRIVATE ${GCPAD_BASE_LIBS})
+
+    find_library(SDL2_LIBRARY NAMES SDL2 SDL2d PATHS "${CMAKE_SOURCE_DIR}/libs" "${CMAKE_SOURCE_DIR}/lib" "${CMAKE_SOURCE_DIR}/third_party/lib")
+    if(SDL2_LIBRARY)
+        target_link_libraries(gcpad PRIVATE ${SDL2_LIBRARY})
+    else()
+        message(WARNING "SDL2 library not found; SDL support will be unavailable until SDL2 is installed and in a library path")
+    endif()
+else()
+    target_link_libraries(gcpad PRIVATE
+        hid
+        setupapi
+    )
+endif()
 
 # Set version properties for the library
 set_target_properties(gcpad PROPERTIES
@@ -73,17 +123,15 @@ install(DIRECTORY include/ DESTINATION include)
 
 # Install CMake config files
 install(EXPORT GCPadTargets
+    FILE GCPadTargets.cmake
     NAMESPACE GCPad::
     DESTINATION lib/cmake/GCPad)
 
 include(CMakePackageConfigHelpers)
-    write_basic_package_version_file(
-        VERSION ${PROJECT_VERSION}
-        COMPATIBILITY SameMajorVersion
-)
-
-configure_package_config_file(
-    INSTALL_DESTINATION lib/cmake/GCPad
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/GCPadConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
 )
 
 configure_file(
@@ -93,7 +141,6 @@ configure_file(
 )
 
 install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/GCPadConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/GCPadConfigVersion.cmake
     DESTINATION lib/cmake/GCPad
 )
