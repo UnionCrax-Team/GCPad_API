@@ -1,0 +1,34 @@
+# Build outputs
+bin/
+obj/
+build/
+*.dll
+*.lib
+*.exe
+*.pdb
+*.ilk
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.suo
+*.user
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*~
+*.tmp
+*.bak
