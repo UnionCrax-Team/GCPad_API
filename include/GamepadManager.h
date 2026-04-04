@@ -3,6 +3,7 @@
 #include "gcpad.h"
 #include <functional>
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace gcpad {
