@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
+
 project(GCPad_API VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -74,11 +75,27 @@ if(WIN32)
 
     target_link_libraries(gcpad PRIVATE ${GCPAD_BASE_LIBS})
 
-    find_library(SDL2_LIBRARY NAMES SDL2 SDL2d PATHS "${CMAKE_SOURCE_DIR}/libs" "${CMAKE_SOURCE_DIR}/lib" "${CMAKE_SOURCE_DIR}/third_party/lib")
-    if(SDL2_LIBRARY)
-        target_link_libraries(gcpad PRIVATE ${SDL2_LIBRARY})
+    # Find SDL2 via vcpkg (preferred) or fallback to manual search
+    find_package(SDL2 CONFIG QUIET)
+    if(SDL2_FOUND)
+        target_link_libraries(gcpad PRIVATE SDL2::SDL2)
     else()
-        message(WARNING "SDL2 library not found; SDL support will be unavailable until SDL2 is installed and in a library path")
+        # Fallback: try pkg-config or manual search
+        find_package(SDL2 MODULE QUIET)
+        if(SDL2_FOUND)
+            target_link_libraries(gcpad PRIVATE ${SDL2_LIBRARIES})
+            target_include_directories(gcpad PRIVATE ${SDL2_INCLUDE_DIRS})
+        else()
+            find_library(SDL2_LIBRARY NAMES SDL2 SDL2d PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
+            if(NOT SDL2_LIBRARY)
+                find_library(SDL2_LIBRARY NAMES SDL2 SDL2d)
+            endif()
+            if(SDL2_LIBRARY)
+                target_link_libraries(gcpad PRIVATE ${SDL2_LIBRARY})
+            else()
+                message(WARNING "SDL2 not found via vcpkg or system. SDL support will be unavailable.")
+            endif()
+        endif()
     endif()
 else()
     target_link_libraries(gcpad PRIVATE

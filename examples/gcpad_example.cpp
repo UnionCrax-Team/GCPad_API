@@ -1,7 +1,7 @@
 // GCPad API Example
 // Demonstrates: controller enumeration, reading inputs, and remapping to keyboard/mouse
 //
-// Build with: cmake -S . -B build && cmake --build build --config Release
+// Build with: cmake -S examples -B build && cmake --build build --config Release
 // Run:        build/Release/gcpad_example.exe
 
 #include "GamepadManager.h"

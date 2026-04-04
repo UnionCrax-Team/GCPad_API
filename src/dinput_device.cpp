@@ -11,10 +11,6 @@
 #include <iomanip>
 #include <iostream>
 
-#pragma comment(lib, "dinput8.lib")
-#pragma comment(lib, "dxguid.lib")
-#pragma comment(lib, "ole32.lib")
-#pragma comment(lib, "oleaut32.lib")
 
 namespace gcpad {
 namespace internal {
