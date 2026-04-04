@@ -26,7 +26,6 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgDirectory: ${{ runner.temp }}/vcpkg
-          appendedGraph: ${{ env.VCPKG_DEFAULT_TRIPLET }}
 
       - name: Configure
         shell: cmd
@@ -62,7 +61,6 @@ jobs:
         uses: lukka/run-vcpkg@v11
         with:
           vcpkgDirectory: ${{ runner.temp }}/vcpkg
-          appendedGraph: ${{ env.VCPKG_DEFAULT_TRIPLET }}
 
       - name: Configure
         shell: cmd

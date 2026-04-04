@@ -1,0 +1,4 @@
+{
+    "dependencies": ["sdl2"],
+    "builtin-baseline": "5ed70064390f11112c34b91a6382bba0fdc1706d"
+}
