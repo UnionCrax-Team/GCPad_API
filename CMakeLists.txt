@@ -10,6 +10,9 @@ add_library(gcpad SHARED
     src/ps_device.cpp
     src/xbox_device.cpp
     src/nintendo_device.cpp
+    src/xinput_device.cpp
+    src/dinput_device.cpp
+    src/sdl_device.cpp
     src/GamepadManager.cpp
     src/build_metadata.cpp
     gcpadLib/controller_library.cpp
@@ -31,9 +34,12 @@ if(WIN32)
     # Add local libs directory as fallback so the project can build from copied .lib files
     link_directories("${CMAKE_SOURCE_DIR}/libs")
 
-    find_library(XINPUT_LIB NAMES xinput1_4 xinput9_1_0 PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
+    # XInput: ALWAYS use Windows SDK version (local libs/ may have wrong architecture)
+    # The local XInput1_4.lib in libs/ is ARM architecture, which conflicts with x64 builds.
+    # We skip NO_DEFAULT_PATH to let CMake find the correct SDK library.
+    find_library(XINPUT_LIB NAMES xinput1_4 xinput9_1_0)
     if(NOT XINPUT_LIB)
-        find_library(XINPUT_LIB NAMES xinput1_4 xinput9_1_0)
+        message(WARNING "XInput library not found (xinput1_4 / xinput9_1_0). Please install Windows SDK.")
     endif()
 
     find_library(DINPUT_LIB NAMES dinput8 PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
@@ -144,3 +150,16 @@ install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/GCPadConfigVersion.cmake
     DESTINATION lib/cmake/GCPad
 )
+
+# Example / test executable (optional, for development)
+option(GCPAD_BUILD_EXAMPLE "Build the gcpad_example test program" ON)
+if(GCPAD_BUILD_EXAMPLE)
+    add_executable(gcpad_example examples/gcpad_example.cpp)
+    target_link_libraries(gcpad_example PRIVATE gcpad)
+    # Copy DLL next to executable for running
+    add_custom_command(TARGET gcpad_example POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:gcpad>
+            $<TARGET_FILE_DIR:gcpad_example>
+    )
+endif()

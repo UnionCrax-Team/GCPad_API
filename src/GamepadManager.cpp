@@ -3,11 +3,15 @@
 #include "ps_device.h"
 #include "xbox_device.h"
 #include "nintendo_device.h"
+#include "xinput_device.h"
+#include "dinput_device.h"
+#include "sdl_device.h"
 #include <thread>
 #include <atomic>
 #include <mutex>
 #include <iostream>
 #include <algorithm>
+#include <set>
 
 namespace gcpad {
 
@@ -58,11 +62,27 @@ private:
     void hotplug_detection_loop();
     void check_for_new_devices();
     void check_for_disconnected_devices();
+    void check_for_xinput_devices();
+    void check_for_dinput_devices();
+    void check_for_sdl_devices();
     int find_available_slot() const;
     int find_slot_for_path(const std::string& path) const;
+    bool is_xinput_slot(int slot) const;
     bool is_supported_device(uint16_t vendor_id, uint16_t product_id) const;
+    bool is_vid_pid_already_connected(uint16_t vid, uint16_t pid) const;
     std::unique_ptr<GamepadDevice> create_device(std::unique_ptr<internal::HidDevice> hid_device, int slot);
     void apply_remapper_to_all();
+
+    // Track which XInput indices are already assigned
+    int xinput_slot_map_[4] = {-1, -1, -1, -1}; // XInput index -> slot
+
+    // Track DInput/SDL instance IDs to avoid re-adding
+    std::set<std::string> dinput_guids_;  // Set of connected DInput GUIDs
+    std::set<int> sdl_indices_;           // Set of connected SDL joystick indices
+
+    // Subsystem init state
+    bool dinput_initialized_ = false;
+    bool sdl_initialized_ = false;
 };
 
 GamepadManagerImpl::GamepadManagerImpl()
@@ -81,20 +101,30 @@ bool GamepadManagerImpl::initialize() {
     auto hid_devices = internal::enumerate_hid_devices();
 
     for (auto& hid_device : hid_devices) {
-        auto attributes = hid_device->get_attributes();
-        if (!is_supported_device(attributes.vendor_id, attributes.product_id)) {
-            continue;
-        }
-
         std::string current_path = hid_device->device_path();
         if (find_slot_for_path(current_path) != -1) {
             continue;
         }
 
-        int slot = find_available_slot();
-        if (slot == -1) {
+        // Must open device before reading attributes
+        if (!hid_device->open()) {
             continue;
         }
+
+        auto attributes = hid_device->get_attributes();
+        if (!is_supported_device(attributes.vendor_id, attributes.product_id)) {
+            hid_device->close();
+            continue;
+        }
+
+        int slot = find_available_slot();
+        if (slot == -1) {
+            hid_device->close();
+            continue;
+        }
+
+        // Close before handing to device (device re-opens in updateState)
+        hid_device->close();
 
         gamepads_[slot] = create_device(std::move(hid_device), slot);
         connected_device_paths_[slot] = current_path;
@@ -108,6 +138,21 @@ bool GamepadManagerImpl::initialize() {
         }
     }
 
+    // Also scan for XInput devices (Xbox controllers that don't expose via raw HID)
+    check_for_xinput_devices();
+
+    // Initialize DirectInput and scan for non-HID, non-XInput controllers
+    dinput_initialized_ = internal::initializeDInput();
+    if (dinput_initialized_) {
+        check_for_dinput_devices();
+    }
+
+    // Initialize SDL2 and scan for any remaining controllers
+    sdl_initialized_ = internal::initializeSDL();
+    if (sdl_initialized_) {
+        check_for_sdl_devices();
+    }
+
     hotplug_running_ = true;
     hotplug_thread_ = std::thread(&GamepadManagerImpl::hotplug_detection_loop, this);
 
@@ -115,17 +160,33 @@ bool GamepadManagerImpl::initialize() {
 }
 
 void GamepadManagerImpl::shutdown() {
-    std::lock_guard<std::mutex> lock(mutex_);
-
+    // Signal the hotplug thread to stop BEFORE locking the mutex.
+    // The hotplug thread also acquires this mutex, so joining while
+    // holding it would deadlock.
     hotplug_running_ = false;
     if (hotplug_thread_.joinable()) {
         hotplug_thread_.join();
     }
 
+    // Now safe to lock — hotplug thread is dead
+    std::lock_guard<std::mutex> lock(mutex_);
+
     for (auto& gamepad : gamepads_) {
         gamepad.reset();
     }
     std::fill(connected_device_paths_.begin(), connected_device_paths_.end(), std::string());
+    dinput_guids_.clear();
+    sdl_indices_.clear();
+
+    // Shutdown subsystems
+    if (sdl_initialized_) {
+        internal::shutdownSDL();
+        sdl_initialized_ = false;
+    }
+    if (dinput_initialized_) {
+        internal::shutdownDInput();
+        dinput_initialized_ = false;
+    }
 }
 
 int GamepadManagerImpl::getConnectedGamepadCount() const {
@@ -218,6 +279,9 @@ void GamepadManagerImpl::hotplug_detection_loop() {
         std::lock_guard<std::mutex> lock(mutex_);
 
         check_for_new_devices();
+        check_for_xinput_devices();
+        if (dinput_initialized_) check_for_dinput_devices();
+        if (sdl_initialized_) check_for_sdl_devices();
         check_for_disconnected_devices();
     }
 }
@@ -231,15 +295,25 @@ void GamepadManagerImpl::check_for_new_devices() {
             continue;
         }
 
+        // Must open device before reading attributes
+        if (!hid_device->open()) {
+            continue;
+        }
+
         auto attributes = hid_device->get_attributes();
         if (!is_supported_device(attributes.vendor_id, attributes.product_id)) {
+            hid_device->close();
             continue;
         }
 
         int slot = find_available_slot();
         if (slot == -1) {
+            hid_device->close();
             continue;
         }
+
+        // Close before handing to device (device re-opens in updateState)
+        hid_device->close();
 
         gamepads_[slot] = create_device(std::move(hid_device), slot);
         connected_device_paths_[slot] = path;
@@ -254,9 +328,135 @@ void GamepadManagerImpl::check_for_new_devices() {
     }
 }
 
+void GamepadManagerImpl::check_for_xinput_devices() {
+    auto xinput_indices = internal::getConnectedXInputIndices();
+
+    for (int xi : xinput_indices) {
+        // Skip if this XInput index already has a slot
+        if (xinput_slot_map_[xi] >= 0 && gamepads_[xinput_slot_map_[xi]]) {
+            continue;
+        }
+
+        int slot = find_available_slot();
+        if (slot == -1) break;
+
+        gamepads_[slot] = internal::createXInputDevice(xi, slot);
+        connected_device_paths_[slot] = "xinput:" + std::to_string(xi);
+        xinput_slot_map_[xi] = slot;
+
+        if (global_remapper_ && gamepads_[slot]) {
+            gamepads_[slot]->setRemapper(global_remapper_);
+        }
+
+        if (connected_callback_) {
+            connected_callback_(slot);
+        }
+    }
+}
+
+bool GamepadManagerImpl::is_xinput_slot(int slot) const {
+    for (int i = 0; i < 4; ++i) {
+        if (xinput_slot_map_[i] == slot) return true;
+    }
+    return false;
+}
+
+bool GamepadManagerImpl::is_vid_pid_already_connected(uint16_t vid, uint16_t pid) const {
+    // Check if any HID or XInput device already has this VID/PID
+    // to avoid double-detection across backends
+    if (vid == 0 && pid == 0) return false;
+    if (is_supported_device(vid, pid)) return true; // HID-handled brand
+    return false;
+}
+
+void GamepadManagerImpl::check_for_dinput_devices() {
+    auto di_devices = internal::enumerateDInputDevices();
+
+    for (const auto& di_info : di_devices) {
+        // Skip if already tracked
+        if (dinput_guids_.count(di_info.instance_guid) > 0) {
+            continue;
+        }
+        // Skip if this VID/PID is already connected via HID or XInput
+        if (find_slot_for_path("dinput:" + di_info.instance_guid) != -1) {
+            continue;
+        }
+
+        int slot = find_available_slot();
+        if (slot == -1) break;
+
+        auto device = internal::createDInputDevice(di_info.instance_guid, slot);
+        if (!device) continue;
+
+        gamepads_[slot] = std::move(device);
+        connected_device_paths_[slot] = "dinput:" + di_info.instance_guid;
+        dinput_guids_.insert(di_info.instance_guid);
+
+        if (global_remapper_ && gamepads_[slot]) {
+            gamepads_[slot]->setRemapper(global_remapper_);
+        }
+
+        if (connected_callback_) {
+            connected_callback_(slot);
+        }
+    }
+}
+
+void GamepadManagerImpl::check_for_sdl_devices() {
+    auto sdl_devices = internal::enumerateSDLDevices();
+
+    for (const auto& sdl_info : sdl_devices) {
+        // Skip if already tracked
+        if (sdl_indices_.count(sdl_info.sdl_joystick_index) > 0) {
+            continue;
+        }
+        // Skip if a device with this VID/PID is already connected via another backend
+        std::string sdl_path = "sdl:" + std::to_string(sdl_info.sdl_joystick_index);
+        if (find_slot_for_path(sdl_path) != -1) {
+            continue;
+        }
+
+        int slot = find_available_slot();
+        if (slot == -1) break;
+
+        auto device = internal::createSDLDevice(sdl_info.sdl_joystick_index, slot);
+        if (!device) continue;
+
+        gamepads_[slot] = std::move(device);
+        connected_device_paths_[slot] = sdl_path;
+        sdl_indices_.insert(sdl_info.sdl_joystick_index);
+
+        if (global_remapper_ && gamepads_[slot]) {
+            gamepads_[slot]->setRemapper(global_remapper_);
+        }
+
+        if (connected_callback_) {
+            connected_callback_(slot);
+        }
+    }
+}
+
 void GamepadManagerImpl::check_for_disconnected_devices() {
     for (int i = 0; i < MAX_GAMEPADS; ++i) {
         if (gamepads_[i] && !gamepads_[i]->isConnected()) {
+            // Clear XInput slot mapping if applicable
+            for (int xi = 0; xi < 4; ++xi) {
+                if (xinput_slot_map_[xi] == i) {
+                    xinput_slot_map_[xi] = -1;
+                    break;
+                }
+            }
+
+            // Clear DInput GUID tracking
+            const auto& path = connected_device_paths_[i];
+            if (path.rfind("dinput:", 0) == 0) {
+                dinput_guids_.erase(path.substr(7));
+            }
+            // Clear SDL index tracking
+            if (path.rfind("sdl:", 0) == 0) {
+                try { sdl_indices_.erase(std::stoi(path.substr(4))); } catch (...) {}
+            }
+
             gamepads_[i].reset();
             connected_device_paths_[i].clear();
             if (disconnected_callback_) {

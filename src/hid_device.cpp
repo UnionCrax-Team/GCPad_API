@@ -11,20 +11,15 @@
 namespace gcpad {
 namespace internal {
 
-// Helper function to get string descriptor
-static std::string get_string_descriptor(HANDLE handle, uint8_t index) {
-    if (index == 0) return "";
-
-    std::vector<wchar_t> buffer(256);
-    if (HidD_GetIndexedString(handle, index, reinterpret_cast<PVOID>(buffer.data()), static_cast<ULONG>(buffer.size() * sizeof(wchar_t)))) {
-        std::string result;
-        for (auto& c : buffer) {
-            if (c == L'\0') break;
-            result += static_cast<char>(c);
-        }
-        return result;
+// Helper to convert wide string buffer to narrow string
+static std::string wide_buffer_to_string(const wchar_t* buffer, size_t max_len) {
+    std::string result;
+    for (size_t i = 0; i < max_len && buffer[i] != L'\0'; ++i) {
+        // Simple WCS to MBS for ASCII-range characters; non-ASCII becomes '?'
+        wchar_t c = buffer[i];
+        result += (c >= 0x20 && c < 0x7F) ? static_cast<char>(c) : '?';
     }
-    return "";
+    return result;
 }
 
 HidDevice::HidDevice(const std::string& device_path)
@@ -114,17 +109,29 @@ HidDeviceCapabilities HidDevice::get_capabilities() const {
 
 std::string HidDevice::get_product_string() const {
     if (!is_open()) return "";
-    return get_string_descriptor(handle_, HidD_GetProductString(handle_, nullptr, 0) ? 1 : 0);
+    wchar_t buffer[256] = {};
+    if (HidD_GetProductString(handle_, buffer, sizeof(buffer))) {
+        return wide_buffer_to_string(buffer, 256);
+    }
+    return "";
 }
 
 std::string HidDevice::get_manufacturer_string() const {
     if (!is_open()) return "";
-    return get_string_descriptor(handle_, HidD_GetManufacturerString(handle_, nullptr, 0) ? 1 : 0);
+    wchar_t buffer[256] = {};
+    if (HidD_GetManufacturerString(handle_, buffer, sizeof(buffer))) {
+        return wide_buffer_to_string(buffer, 256);
+    }
+    return "";
 }
 
 std::string HidDevice::get_serial_number_string() const {
     if (!is_open()) return "";
-    return get_string_descriptor(handle_, HidD_GetSerialNumberString(handle_, nullptr, 0) ? 1 : 0);
+    wchar_t buffer[256] = {};
+    if (HidD_GetSerialNumberString(handle_, buffer, sizeof(buffer))) {
+        return wide_buffer_to_string(buffer, 256);
+    }
+    return "";
 }
 
 bool HidDevice::read(std::vector<uint8_t>& buffer) {
