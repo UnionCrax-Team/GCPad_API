@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [ main, master ]
 
-env:
-  VCPKG_DEFAULT_TRIPLET: x64-windows
-
 jobs:
   build:
     strategy:
@@ -22,19 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: ${{ runner.temp }}/vcpkg
-
       - name: Configure
         shell: cmd
         run: >
           cmake -B build
           -G "Visual Studio 17 2022"
           -A x64
-          -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
 
       - name: Build
         shell: cmd
@@ -57,18 +47,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgDirectory: ${{ runner.temp }}/vcpkg
-
       - name: Configure
         shell: cmd
         run: >
           cmake -B build
           -G "Ninja"
-          -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
           -DGCPAD_BUILD_EXAMPLE=ON
 
       - name: Build Release

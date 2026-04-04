@@ -32,71 +32,19 @@ target_include_directories(gcpad PUBLIC
 # Link required libraries
 # Include HID, SetupAPI, XInput, DirectInput, and SDL2 imports
 if(WIN32)
-    # Add local libs directory as fallback so the project can build from copied .lib files
+    # Add local libs directory so CMake can find .lib files
     link_directories("${CMAKE_SOURCE_DIR}/libs")
 
-    # XInput: ALWAYS use Windows SDK version (local libs/ may have wrong architecture)
-    # The local XInput1_4.lib in libs/ is ARM architecture, which conflicts with x64 builds.
-    # We skip NO_DEFAULT_PATH to let CMake find the correct SDK library.
-    find_library(XINPUT_LIB NAMES xinput1_4 xinput9_1_0)
-    if(NOT XINPUT_LIB)
-        message(WARNING "XInput library not found (xinput1_4 / xinput9_1_0). Please install Windows SDK.")
-    endif()
-
-    find_library(DINPUT_LIB NAMES dinput8 PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
-    if(NOT DINPUT_LIB)
-        find_library(DINPUT_LIB NAMES dinput8)
-    endif()
-
-    find_library(DXGUID_LIB NAMES dxguid PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
-    if(NOT DXGUID_LIB)
-        find_library(DXGUID_LIB NAMES dxguid)
-    endif()
-
-    set(GCPAD_BASE_LIBS hid setupapi)
-
-    if(XINPUT_LIB)
-        list(APPEND GCPAD_BASE_LIBS ${XINPUT_LIB})
-    else()
-        message(WARNING "XInput library not found (xinput1_4 / xinput9_1_0). Please place the .lib into libs/ or install Windows SDK.")
-    endif()
-
-    if(DINPUT_LIB)
-        list(APPEND GCPAD_BASE_LIBS ${DINPUT_LIB})
-    else()
-        message(WARNING "DirectInput library not found (dinput8). Please place the .lib into libs/ or install Windows SDK.")
-    endif()
-
-    if(DXGUID_LIB)
-        list(APPEND GCPAD_BASE_LIBS ${DXGUID_LIB})
-    else()
-        message(WARNING "dxguid library not found. Please place the .lib into libs/ or install Windows SDK.")
-    endif()
-
-    target_link_libraries(gcpad PRIVATE ${GCPAD_BASE_LIBS})
-
-    # Find SDL2 via vcpkg (preferred) or fallback to manual search
-    find_package(SDL2 CONFIG QUIET)
-    if(SDL2_FOUND)
-        target_link_libraries(gcpad PRIVATE SDL2::SDL2)
-    else()
-        # Fallback: try pkg-config or manual search
-        find_package(SDL2 MODULE QUIET)
-        if(SDL2_FOUND)
-            target_link_libraries(gcpad PRIVATE ${SDL2_LIBRARIES})
-            target_include_directories(gcpad PRIVATE ${SDL2_INCLUDE_DIRS})
-        else()
-            find_library(SDL2_LIBRARY NAMES SDL2 SDL2d PATHS "${CMAKE_SOURCE_DIR}/libs" NO_DEFAULT_PATH)
-            if(NOT SDL2_LIBRARY)
-                find_library(SDL2_LIBRARY NAMES SDL2 SDL2d)
-            endif()
-            if(SDL2_LIBRARY)
-                target_link_libraries(gcpad PRIVATE ${SDL2_LIBRARY})
-            else()
-                message(WARNING "SDL2 not found via vcpkg or system. SDL support will be unavailable.")
-            endif()
-        endif()
-    endif()
+    # Use local libraries for all dependencies
+    # xinput9_1_0.lib for broader Windows compatibility
+    target_link_libraries(gcpad PRIVATE
+        hid
+        setupapi
+        "${CMAKE_SOURCE_DIR}/libs/Xinput9_1_0.lib"
+        "${CMAKE_SOURCE_DIR}/libs/dinput8.lib"
+        "${CMAKE_SOURCE_DIR}/libs/dxguid.lib"
+        "${CMAKE_SOURCE_DIR}/libs/SDL2.lib"
+    )
 else()
     target_link_libraries(gcpad PRIVATE
         hid
