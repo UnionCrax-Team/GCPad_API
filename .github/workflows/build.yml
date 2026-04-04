@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  VCPKG_DEFAULT_TRIPLET: x64-windows
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [Debug, Release]
+
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ runner.temp }}/vcpkg
+          appendedGraph: ${{ env.VCPKG_DEFAULT_TRIPLET }}
+
+      - name: Configure
+        shell: cmd
+        run: >
+          cmake -B build
+          -G "Visual Studio 17 2022"
+          -A x64
+          -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
+
+      - name: Build
+        shell: cmd
+        run: cmake --build build --config ${{ matrix.config }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcpad-${{ matrix.config }}
+          path: |
+            build/bin/*.dll
+            build/bin/*.exe
+            build/lib/*.lib
+          if-no-files-found: error
+
+  build-example:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ runner.temp }}/vcpkg
+          appendedGraph: ${{ env.VCPKG_DEFAULT_TRIPLET }}
+
+      - name: Configure
+        shell: cmd
+        run: >
+          cmake -B build
+          -G "Ninja"
+          -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_DEFAULT_TRIPLET }}
+          -DGCPAD_BUILD_EXAMPLE=ON
+
+      - name: Build Release
+        shell: cmd
+        run: cmake --build build --config Release
+
+      - name: Build Debug
+        shell: cmd
+        run: cmake --build build --config Debug
+
+      - name: Upload example artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcpad-example
+          path: |
+            build/bin/gcpad_example.exe
+            build/bin/gcpad.dll
+          if-no-files-found: error
