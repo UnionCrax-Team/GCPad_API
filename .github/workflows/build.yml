@@ -1,23 +1,24 @@
-name: Build
+name: Build and Release
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
+    tags: ['v*.*.*']
   pull_request:
-    branches: [ main, master ]
+    branches: [main, master]
+  workflow_dispatch:
 
 jobs:
+  # ── CI build (every push / PR) ─────────────────────────────────────────────
   build:
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
         config: [Debug, Release]
 
-    runs-on: windows-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure
         shell: cmd
@@ -25,48 +26,61 @@ jobs:
           cmake -B build
           -G "Visual Studio 17 2022"
           -A x64
+          -DGCPAD_BUILD_EXAMPLE=ON
 
       - name: Build
         shell: cmd
         run: cmake --build build --config ${{ matrix.config }}
 
-      - name: Upload build artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: gcpad-${{ matrix.config }}
           path: |
-            build/bin/*.dll
-            build/bin/*.exe
-            build/lib/*.lib
-          if-no-files-found: error
+            build/${{ matrix.config }}/gcpad.dll
+            build/${{ matrix.config }}/gcpad.lib
+            build/${{ matrix.config }}/gcpad_example.exe
+            build/${{ matrix.config }}/SDL2.dll
+          if-no-files-found: warn
 
-  build-example:
+  # ── GitHub Release (version tags only) ────────────────────────────────────
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure
         shell: cmd
         run: >
           cmake -B build
-          -G "Ninja"
+          -G "Visual Studio 17 2022"
+          -A x64
           -DGCPAD_BUILD_EXAMPLE=ON
 
       - name: Build Release
         shell: cmd
         run: cmake --build build --config Release
 
-      - name: Build Debug
-        shell: cmd
-        run: cmake --build build --config Debug
+      - name: Collect release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-assets
+          Copy-Item build/Release/gcpad.dll   release-assets/gcpad.dll
+          Copy-Item build/Release/gcpad.lib   release-assets/gcpad.lib
+          # SDL2.dll is copied next to the example by the POST_BUILD command
+          Copy-Item build/Release/SDL2.dll    release-assets/SDL2.dll
+          # Also bundle public headers for consumers
+          Compress-Archive -Path include/* -DestinationPath release-assets/gcpad-include.zip
 
-      - name: Upload example artifacts
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: gcpad-example
-          path: |
-            build/bin/gcpad_example.exe
-            build/bin/gcpad.dll
-          if-no-files-found: error
+          files: release-assets/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

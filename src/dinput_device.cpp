@@ -50,23 +50,6 @@ static GUID string_to_guid(const std::string& s) {
     return g;
 }
 
-/// Check whether a DirectInput device is really an XInput device.
-/// XInput devices embed "IG_" in their device path.  This is the
-/// standard Microsoft-recommended way to filter them out.
-static bool isXInputDevice(const GUID& guidProduct) {
-    // Quick path check: DI device paths for XInput contain "IG_"
-    // We do a brute-force WMI check (official MS approach).
-    // However the simpler path-based heuristic works well enough:
-    // XInput devices have a product GUID whose first DWORD embeds
-    // the PID in the high word. Known XInput VID is 0x045E.
-    // For simplicity, we check the product GUID string for the
-    // standard XInput "pidvid" pattern. This is not 100% accurate
-    // but avoids the heavy WMI dependency.
-    (void)guidProduct;
-    // We will rely on the full WMI path approach below.
-    return false;
-}
-
 // ── XInput detection via device path ────────────────────────────────────────
 // DirectInput enumerates XInput devices too. We detect them by checking if
 // "IG_" appears in the device instance path (standard MS recommendation).
@@ -185,10 +168,10 @@ DInputDevice::DInputDevice(const std::string& instance_guid, int slot)
         return;
     }
 
-    // Set cooperative level — background + non-exclusive so we don't steal focus
-    // Use nullptr for HWND since we're a DLL; DISCL_BACKGROUND allows reading
-    // without a window handle.
-    device_->SetCooperativeLevel(nullptr, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
+    // Set cooperative level — background + non-exclusive so we don't steal focus.
+    // DirectInput requires a valid HWND; GetDesktopWindow() is the standard
+    // workaround for background services/DLLs that have no window of their own.
+    device_->SetCooperativeLevel(GetDesktopWindow(), DISCL_BACKGROUND | DISCL_NONEXCLUSIVE);
 
     // Auto-set axis ranges to [-32768, 32767]
     DIPROPRANGE range;
@@ -290,10 +273,10 @@ bool DInputDevice::updateState() {
     state_.setTimestamp(std::chrono::steady_clock::now());
 
     // Axes: DI axes are LONG in [-32768, 32767] (we set DIPROP_RANGE)
-    state_.axes[static_cast<size_t>(Axis::LeftX)]  = js.lX / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::LeftY)]  = js.lY / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::RightX)] = js.lZ / 32767.0f;  // Often Z = right stick X
-    state_.axes[static_cast<size_t>(Axis::RightY)] = js.lRz / 32767.0f; // Rz = right stick Y
+    state_.axes[static_cast<size_t>(Axis::LeftX)]  = js.lX / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::LeftY)]  = js.lY / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::RightX)] = js.lZ / 32768.0f;  // Often Z = right stick X
+    state_.axes[static_cast<size_t>(Axis::RightY)] = js.lRz / 32768.0f; // Rz = right stick Y
 
     // Triggers: DirectInput often maps triggers to Rx/Ry or combined Z axis.
     // We'll use Rx and Ry as individual triggers (range [-32768, 32767]).

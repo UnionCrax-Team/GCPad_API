@@ -192,13 +192,13 @@ bool SDLDevice::updateFromGameController() {
 
     // Axes (SDL range: -32768 to 32767)
     state_.axes[static_cast<size_t>(Axis::LeftX)] =
-        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_LEFTX) / 32767.0f;
+        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_LEFTX) / 32768.0f;
     state_.axes[static_cast<size_t>(Axis::LeftY)] =
-        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_LEFTY) / 32767.0f;
+        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_LEFTY) / 32768.0f;
     state_.axes[static_cast<size_t>(Axis::RightX)] =
-        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_RIGHTX) / 32767.0f;
+        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_RIGHTX) / 32768.0f;
     state_.axes[static_cast<size_t>(Axis::RightY)] =
-        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_RIGHTY) / 32767.0f;
+        SDL_GameControllerGetAxis(controller_, SDL_CONTROLLER_AXIS_RIGHTY) / 32768.0f;
 
     // Triggers (SDL range: 0 to 32767)
     state_.axes[static_cast<size_t>(Axis::LeftTrigger)] =
@@ -234,10 +234,10 @@ bool SDLDevice::updateFromJoystick() {
     int numHats = SDL_JoystickNumHats(joystick_);
 
     // Axes (up to 6)
-    if (numAxes >= 1) state_.axes[static_cast<size_t>(Axis::LeftX)]  = SDL_JoystickGetAxis(joystick_, 0) / 32767.0f;
-    if (numAxes >= 2) state_.axes[static_cast<size_t>(Axis::LeftY)]  = SDL_JoystickGetAxis(joystick_, 1) / 32767.0f;
-    if (numAxes >= 3) state_.axes[static_cast<size_t>(Axis::RightX)] = SDL_JoystickGetAxis(joystick_, 2) / 32767.0f;
-    if (numAxes >= 4) state_.axes[static_cast<size_t>(Axis::RightY)] = SDL_JoystickGetAxis(joystick_, 3) / 32767.0f;
+    if (numAxes >= 1) state_.axes[static_cast<size_t>(Axis::LeftX)]  = SDL_JoystickGetAxis(joystick_, 0) / 32768.0f;
+    if (numAxes >= 2) state_.axes[static_cast<size_t>(Axis::LeftY)]  = SDL_JoystickGetAxis(joystick_, 1) / 32768.0f;
+    if (numAxes >= 3) state_.axes[static_cast<size_t>(Axis::RightX)] = SDL_JoystickGetAxis(joystick_, 2) / 32768.0f;
+    if (numAxes >= 4) state_.axes[static_cast<size_t>(Axis::RightY)] = SDL_JoystickGetAxis(joystick_, 3) / 32768.0f;
     if (numAxes >= 5) state_.axes[static_cast<size_t>(Axis::LeftTrigger)]  = (SDL_JoystickGetAxis(joystick_, 4) + 32768.0f) / 65535.0f;
     if (numAxes >= 6) state_.axes[static_cast<size_t>(Axis::RightTrigger)] = (SDL_JoystickGetAxis(joystick_, 5) + 32768.0f) / 65535.0f;
 
@@ -300,14 +300,14 @@ bool SDLDevice::setRumble(const Rumble& rumble) {
 bool initializeSDL() {
     if (g_sdl_initialized) return true;
 
+    // Must set this hint before SDL_Init so it applies to joystick enumeration
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+
     // Only init joystick + gamecontroller subsystems (not video/audio)
     if (SDL_Init(SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
         std::cerr << "[gcpad] SDL_Init failed: " << SDL_GetError() << std::endl;
         return false;
     }
-
-    // Enable background joystick events so we can poll without a window
-    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
     g_sdl_initialized = true;
     return true;

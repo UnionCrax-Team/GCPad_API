@@ -9,7 +9,6 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
-#include <iostream>
 #include <algorithm>
 #include <set>
 
@@ -69,8 +68,7 @@ private:
     int find_slot_for_path(const std::string& path) const;
     bool is_xinput_slot(int slot) const;
     bool is_supported_device(uint16_t vendor_id, uint16_t product_id) const;
-    bool is_vid_pid_already_connected(uint16_t vid, uint16_t pid) const;
-    std::unique_ptr<GamepadDevice> create_device(std::unique_ptr<internal::HidDevice> hid_device, int slot);
+    std::unique_ptr<GamepadDevice> create_device(std::unique_ptr<internal::HidDevice> hid_device, const internal::HidDeviceAttributes& attributes, int slot);
     void apply_remapper_to_all();
 
     // Track which XInput indices are already assigned
@@ -126,7 +124,7 @@ bool GamepadManagerImpl::initialize() {
         // Close before handing to device (device re-opens in updateState)
         hid_device->close();
 
-        gamepads_[slot] = create_device(std::move(hid_device), slot);
+        gamepads_[slot] = create_device(std::move(hid_device), attributes, slot);
         connected_device_paths_[slot] = current_path;
 
         if (global_remapper_ && gamepads_[slot]) {
@@ -315,7 +313,7 @@ void GamepadManagerImpl::check_for_new_devices() {
         // Close before handing to device (device re-opens in updateState)
         hid_device->close();
 
-        gamepads_[slot] = create_device(std::move(hid_device), slot);
+        gamepads_[slot] = create_device(std::move(hid_device), attributes, slot);
         connected_device_paths_[slot] = path;
 
         if (global_remapper_ && gamepads_[slot]) {
@@ -358,14 +356,6 @@ bool GamepadManagerImpl::is_xinput_slot(int slot) const {
     for (int i = 0; i < 4; ++i) {
         if (xinput_slot_map_[i] == slot) return true;
     }
-    return false;
-}
-
-bool GamepadManagerImpl::is_vid_pid_already_connected(uint16_t vid, uint16_t pid) const {
-    // Check if any HID or XInput device already has this VID/PID
-    // to avoid double-detection across backends
-    if (vid == 0 && pid == 0) return false;
-    if (is_supported_device(vid, pid)) return true; // HID-handled brand
     return false;
 }
 
@@ -509,8 +499,7 @@ bool GamepadManagerImpl::is_supported_device(uint16_t vendor_id, uint16_t produc
     return false;
 }
 
-std::unique_ptr<GamepadDevice> GamepadManagerImpl::create_device(std::unique_ptr<internal::HidDevice> hid_device, int slot) {
-    auto attributes = hid_device->get_attributes();
+std::unique_ptr<GamepadDevice> GamepadManagerImpl::create_device(std::unique_ptr<internal::HidDevice> hid_device, const internal::HidDeviceAttributes& attributes, int slot) {
 
     auto ps_infos = internal::getPlayStationDeviceInfos();
     if (std::any_of(ps_infos.begin(), ps_infos.end(), [&](const internal::PlayStationDeviceInfo& info) {
@@ -551,26 +540,13 @@ std::vector<HidDeviceInfo> getAllHidDevices() {
     // Enumerate ALL HID devices
     auto devices = internal::enumerate_hid_devices();
     
-    std::cerr << "[DEBUG] enumerate_hid_devices returned " << devices.size() << " devices" << std::endl;
-    
-    for (size_t i = 0; i < devices.size(); ++i) {
-        auto& dev = devices[i];
-
-        // Try to open the device to retrieve attributes
-        bool opened = dev->open();
-        std::cerr << "[DEBUG] Device " << i << " open: " << (opened ? "YES" : "NO")
-                  << " path=" << dev->device_path() << std::endl;
-
-        if (!opened) {
-            // Skip devices we cannot read, first ones usually not controllers
+    for (auto& dev : devices) {
+        if (!dev->open()) {
             continue;
         }
 
         auto attrs = dev->get_attributes();
         std::string product_str = dev->get_product_string();
-        std::cerr << "[DEBUG] Device " << i << " VID:PID = " << std::hex << attrs.vendor_id
-                  << ":" << attrs.product_id << std::dec << std::endl;
-        std::cerr << "[DEBUG] Device " << i << " Product: '" << product_str << "'" << std::endl;
 
         dev->close();
 

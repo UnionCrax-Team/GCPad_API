@@ -148,10 +148,10 @@ bool XboxDevice::parse_input_report(const std::vector<uint8_t>& report) {
     int16_t rx = static_cast<int16_t>(report[10] | (report[11] << 8));
     int16_t ry = static_cast<int16_t>(report[12] | (report[13] << 8));
 
-    state_.axes[static_cast<size_t>(Axis::LeftX)]  = lx / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::LeftY)]  = ly / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::RightX)] = rx / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::RightY)] = ry / 32767.0f;
+    state_.axes[static_cast<size_t>(Axis::LeftX)]  = lx / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::LeftY)]  = ly / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::RightX)] = rx / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::RightY)] = ry / 32768.0f;
 
     // Triggers (8-bit, at bytes 2-3)
     state_.axes[static_cast<size_t>(Axis::LeftTrigger)]  = report[2] / 255.0f;

@@ -281,7 +281,7 @@ bool PlayStationDevice::parse_ds4_bt(const std::vector<uint8_t>& report) {
     // Byte 3 = LX, 4 = LY, 5 = RX, 6 = RY
     // Byte 7 = buttons1, 8 = buttons2, 9 = PS/TP counter
     // Byte 10 = L2, 11 = R2
-    if (report.size() < 12) return false;
+    if (report.size() < 32) return false;
     if (report[0] != 0x11) return false;
 
     state_.setTimestamp(std::chrono::steady_clock::now());

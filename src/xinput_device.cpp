@@ -95,10 +95,10 @@ bool XInputDevice::updateState() {
     state_.buttons[static_cast<size_t>(Button::R2)] = (gp.bRightTrigger > 128);
 
     // Sticks (-32768 to 32767)
-    state_.axes[static_cast<size_t>(Axis::LeftX)]  = gp.sThumbLX / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::LeftY)]  = gp.sThumbLY / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::RightX)] = gp.sThumbRX / 32767.0f;
-    state_.axes[static_cast<size_t>(Axis::RightY)] = gp.sThumbRY / 32767.0f;
+    state_.axes[static_cast<size_t>(Axis::LeftX)]  = gp.sThumbLX / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::LeftY)]  = gp.sThumbLY / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::RightX)] = gp.sThumbRX / 32768.0f;
+    state_.axes[static_cast<size_t>(Axis::RightY)] = gp.sThumbRY / 32768.0f;
 
     // Guide button (requires XInputGetState with hidden ordinal #100 on some SDK versions;
     // standard XInput doesn't expose it, so we skip it)
