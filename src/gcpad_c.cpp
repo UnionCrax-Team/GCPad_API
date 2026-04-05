@@ -106,6 +106,14 @@ int gcpad_get_state(GCPadManagerHandle mgr, int slot, GCPadStateC* out) {
     out->battery_level = st.battery_level;
     out->is_charging   = st.is_charging ? 1u : 0u;
     out->is_connected  = 1u;
+
+    // Touchpad contacts
+    for (int i = 0; i < 2; ++i) {
+        out->touchpad_active[i] = st.touchpad[static_cast<size_t>(i)].active ? 1u : 0u;
+        out->touchpad_x[i]      = st.touchpad[static_cast<size_t>(i)].x;
+        out->touchpad_y[i]      = st.touchpad[static_cast<size_t>(i)].y;
+    }
+
     return 1;
 }
 

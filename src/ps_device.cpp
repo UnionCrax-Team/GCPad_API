@@ -3,6 +3,16 @@
 #include <iostream>
 #include <cstring>
 
+// Parse a 4-byte Sony touchpad contact record.
+// Byte layout: [active_id][x_lo][x_hi_nibble|y_lo_nibble][y_hi]
+// active = bit7 of byte0 is 0 (finger present), 1 (no finger)
+static void parse_touch_point(const uint8_t* p,
+                               bool& active, uint16_t& x, uint16_t& y) {
+    active = (p[0] & 0x80) == 0;
+    x = static_cast<uint16_t>(p[1] | ((p[2] & 0x0F) << 8));
+    y = static_cast<uint16_t>((p[2] >> 4) | (p[3] << 4));
+}
+
 namespace gcpad {
 namespace internal {
 
@@ -230,8 +240,10 @@ void PlayStationDevice::parse_ds4_buttons(const uint8_t* data) {
     state_.buttons[static_cast<size_t>(Button::L3)]     = (buttons2 & 0x40) != 0;
     state_.buttons[static_cast<size_t>(Button::R3)]     = (buttons2 & 0x80) != 0;
 
-    // PS button + touchpad click
-    state_.buttons[static_cast<size_t>(Button::Guide)] = (data[6] & 0x01) != 0;
+    // PS button
+    state_.buttons[static_cast<size_t>(Button::Guide)]    = (data[6] & 0x01) != 0;
+    // Touchpad click
+    state_.buttons[static_cast<size_t>(Button::Touchpad)] = (data[6] & 0x02) != 0;
 
     // Triggers (analog)
     state_.axes[static_cast<size_t>(Axis::LeftTrigger)]  = data[7] / 255.0f;
@@ -253,14 +265,14 @@ bool PlayStationDevice::parse_ds4_usb(const std::vector<uint8_t>& report) {
 
     parse_ds4_buttons(&report[1]);
 
-    // IMU data (gyro + accel) at bytes 13-24
+    // IMU data (gyro + accel) at bytes 13-24, converted to physical units
     if (report.size() >= 25) {
-        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[14] << 8) | report[13]));
-        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[16] << 8) | report[15]));
-        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[18] << 8) | report[17]));
-        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[20] << 8) | report[19]));
-        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[22] << 8) | report[21]));
-        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[24] << 8) | report[23]));
+        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[14] << 8) | report[13])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[16] << 8) | report[15])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[18] << 8) | report[17])) * calibration::SONY_GYRO_SCALE;
+        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[20] << 8) | report[19])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[22] << 8) | report[21])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[24] << 8) | report[23])) * calibration::SONY_ACCEL_SCALE;
     }
 
     // Battery
@@ -268,6 +280,14 @@ bool PlayStationDevice::parse_ds4_usb(const std::vector<uint8_t>& report) {
         uint8_t battery_raw = report[30];
         state_.battery_level = (battery_raw & 0x0F) / 10.0f;
         state_.is_charging = (battery_raw & 0x10) != 0;
+    }
+
+    // Touchpad finger positions — 2 touch records at bytes 35-42
+    if (report.size() >= 43) {
+        parse_touch_point(&report[35],
+            state_.touchpad[0].active, state_.touchpad[0].x, state_.touchpad[0].y);
+        parse_touch_point(&report[39],
+            state_.touchpad[1].active, state_.touchpad[1].x, state_.touchpad[1].y);
     }
 
     return true;
@@ -290,14 +310,14 @@ bool PlayStationDevice::parse_ds4_bt(const std::vector<uint8_t>& report) {
     // Button/axis data starts at byte 3 (offset +2 from USB)
     parse_ds4_buttons(&report[3]);
 
-    // IMU at offset +2: bytes 15-26
+    // IMU at offset +2: bytes 15-26, converted to physical units
     if (report.size() >= 27) {
-        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[16] << 8) | report[15]));
-        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[18] << 8) | report[17]));
-        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[20] << 8) | report[19]));
-        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[22] << 8) | report[21]));
-        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[24] << 8) | report[23]));
-        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[26] << 8) | report[25]));
+        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[16] << 8) | report[15])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[18] << 8) | report[17])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[20] << 8) | report[19])) * calibration::SONY_GYRO_SCALE;
+        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[22] << 8) | report[21])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[24] << 8) | report[23])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[26] << 8) | report[25])) * calibration::SONY_ACCEL_SCALE;
     }
 
     // Battery at offset +2: byte 32
@@ -305,6 +325,14 @@ bool PlayStationDevice::parse_ds4_bt(const std::vector<uint8_t>& report) {
         uint8_t battery_raw = report[32];
         state_.battery_level = (battery_raw & 0x0F) / 10.0f;
         state_.is_charging = (battery_raw & 0x10) != 0;
+    }
+
+    // Touchpad finger positions — 2 touch records at bytes 37-44 (DS4 BT = USB + 2)
+    if (report.size() >= 45) {
+        parse_touch_point(&report[37],
+            state_.touchpad[0].active, state_.touchpad[0].x, state_.touchpad[0].y);
+        parse_touch_point(&report[41],
+            state_.touchpad[1].active, state_.touchpad[1].x, state_.touchpad[1].y);
     }
 
     return true;
@@ -354,8 +382,9 @@ void PlayStationDevice::parse_dualsense_buttons(const uint8_t* data) {
     state_.buttons[static_cast<size_t>(Button::L3)]     = (buttons2 & 0x40) != 0;
     state_.buttons[static_cast<size_t>(Button::R3)]     = (buttons2 & 0x80) != 0;
 
-    // PS button (byte 9, bit 0), Mute (bit 2)
-    state_.buttons[static_cast<size_t>(Button::Guide)] = (data[9] & 0x01) != 0;
+    // PS button (byte 9, bit 0), Touchpad click (bit 1), Mute (bit 2)
+    state_.buttons[static_cast<size_t>(Button::Guide)]    = (data[9] & 0x01) != 0;
+    state_.buttons[static_cast<size_t>(Button::Touchpad)] = (data[9] & 0x02) != 0;
 }
 
 bool PlayStationDevice::parse_dualsense_usb(const std::vector<uint8_t>& report) {
@@ -373,14 +402,14 @@ bool PlayStationDevice::parse_dualsense_usb(const std::vector<uint8_t>& report) 
 
     parse_dualsense_buttons(&report[1]);
 
-    // Gyro/Accel at bytes 15-26
+    // Gyro/Accel at bytes 15-26, converted to physical units
     if (report.size() >= 27) {
-        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[16] << 8) | report[15]));
-        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[18] << 8) | report[17]));
-        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[20] << 8) | report[19]));
-        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[22] << 8) | report[21]));
-        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[24] << 8) | report[23]));
-        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[26] << 8) | report[25]));
+        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[16] << 8) | report[15])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[18] << 8) | report[17])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[20] << 8) | report[19])) * calibration::SONY_GYRO_SCALE;
+        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[22] << 8) | report[21])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[24] << 8) | report[23])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[26] << 8) | report[25])) * calibration::SONY_ACCEL_SCALE;
     }
 
     // Battery at byte 53
@@ -390,6 +419,14 @@ bool PlayStationDevice::parse_dualsense_usb(const std::vector<uint8_t>& report) 
         uint8_t battery_status = (battery_raw >> 4) & 0x0F;
         state_.battery_level = battery_level / 10.0f;
         state_.is_charging = (battery_status == 1 || battery_status == 2);
+    }
+
+    // Touchpad finger positions — 2 touch records at bytes 35-42
+    if (report.size() >= 43) {
+        parse_touch_point(&report[35],
+            state_.touchpad[0].active, state_.touchpad[0].x, state_.touchpad[0].y);
+        parse_touch_point(&report[39],
+            state_.touchpad[1].active, state_.touchpad[1].x, state_.touchpad[1].y);
     }
 
     return true;
@@ -410,14 +447,14 @@ bool PlayStationDevice::parse_dualsense_bt(const std::vector<uint8_t>& report) {
 
     parse_dualsense_buttons(&report[2]);
 
-    // Gyro/Accel at offset +1 from USB positions
+    // Gyro/Accel at offset +1 from USB positions, converted to physical units
     if (report.size() >= 28) {
-        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[17] << 8) | report[16]));
-        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[19] << 8) | report[18]));
-        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[21] << 8) | report[20]));
-        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[23] << 8) | report[22]));
-        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[25] << 8) | report[24]));
-        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[27] << 8) | report[26]));
+        state_.gyro.x  = static_cast<float>(static_cast<int16_t>((report[17] << 8) | report[16])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.y  = static_cast<float>(static_cast<int16_t>((report[19] << 8) | report[18])) * calibration::SONY_GYRO_SCALE;
+        state_.gyro.z  = static_cast<float>(static_cast<int16_t>((report[21] << 8) | report[20])) * calibration::SONY_GYRO_SCALE;
+        state_.accel.x = static_cast<float>(static_cast<int16_t>((report[23] << 8) | report[22])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.y = static_cast<float>(static_cast<int16_t>((report[25] << 8) | report[24])) * calibration::SONY_ACCEL_SCALE;
+        state_.accel.z = static_cast<float>(static_cast<int16_t>((report[27] << 8) | report[26])) * calibration::SONY_ACCEL_SCALE;
     }
 
     // Battery at byte 54
@@ -427,6 +464,14 @@ bool PlayStationDevice::parse_dualsense_bt(const std::vector<uint8_t>& report) {
         uint8_t battery_status = (battery_raw >> 4) & 0x0F;
         state_.battery_level = battery_level / 10.0f;
         state_.is_charging = (battery_status == 1 || battery_status == 2);
+    }
+
+    // Touchpad finger positions — 2 touch records at bytes 36-43 (DualSense BT = USB + 1)
+    if (report.size() >= 44) {
+        parse_touch_point(&report[36],
+            state_.touchpad[0].active, state_.touchpad[0].x, state_.touchpad[0].y);
+        parse_touch_point(&report[40],
+            state_.touchpad[1].active, state_.touchpad[1].x, state_.touchpad[1].y);
     }
 
     return true;

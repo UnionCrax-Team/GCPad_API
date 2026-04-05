@@ -44,7 +44,8 @@ extern "C" {
 #define GCPAD_BUTTON_DPAD_DOWN   14
 #define GCPAD_BUTTON_DPAD_LEFT   15
 #define GCPAD_BUTTON_DPAD_RIGHT  16
-#define GCPAD_BUTTON_COUNT       17
+#define GCPAD_BUTTON_TOUCHPAD    17
+#define GCPAD_BUTTON_COUNT       18
 
 /* Axis indices — match gcpad::Axis enum order */
 #define GCPAD_AXIS_LEFT_X        0
@@ -60,16 +61,21 @@ extern "C" {
 /**
  * Snapshot of a single controller's state.
  * All fields are zeroed / false when the slot is empty.
+ * buttons[GCPAD_BUTTON_TOUCHPAD] is the touchpad click button.
+ * gyro_*/accel_* are in physical units (deg/s and m/s²).
  */
 typedef struct GCPadStateC {
-    uint8_t buttons[GCPAD_BUTTON_COUNT]; /* 1 = pressed, 0 = released */
-    float   axes[GCPAD_AXIS_COUNT];      /* -1.0 .. +1.0 (triggers 0.0 .. 1.0) */
+    uint8_t  buttons[GCPAD_BUTTON_COUNT]; /* 1 = pressed, 0 = released */
+    uint8_t  _pad0[2];                    /* alignment padding before float */
+    float    axes[GCPAD_AXIS_COUNT];      /* -1.0 .. +1.0 (triggers 0.0 .. 1.0) */
     float   gyro_x,  gyro_y,  gyro_z;   /* degrees/s, 0 if unavailable */
     float   accel_x, accel_y, accel_z;  /* m/s², 0 if unavailable */
-    float   battery_level;              /* 0.0 = empty, 1.0 = full */
-    uint8_t is_charging;
-    uint8_t is_connected;
-    uint8_t _pad[2];                    /* alignment */
+    float    battery_level;              /* 0.0 = empty, 1.0 = full */
+    uint8_t  is_charging;
+    uint8_t  is_connected;
+    uint8_t  touchpad_active[2];         /* 1 = finger touching, index 0/1 */
+    uint16_t touchpad_x[2];              /* finger X coordinate, 0..1919 */
+    uint16_t touchpad_y[2];              /* finger Y coordinate, 0..941 (DS4) / 0..1079 (DualSense) */
 } GCPadStateC;
 
 /** Opaque manager handle — never dereference from caller code. */

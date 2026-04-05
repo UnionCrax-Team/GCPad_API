@@ -18,6 +18,7 @@ enum class Button {
     Start, Select, Guide,
     L1, R1, L2, R2, L3, R3,
     DPad_Up, DPad_Down, DPad_Left, DPad_Right,
+    Touchpad,
     COUNT
 };
 
@@ -40,6 +41,9 @@ struct GCPAD_API GamepadState {
     struct {
         float x = 0.0f, y = 0.0f, z = 0.0f;
     } gyro, accel;
+
+    // Touchpad finger contacts (index 0 = first finger, 1 = second finger)
+    std::array<TouchPoint, 2> touchpad = {};
 
     // Battery level (0.0 = empty, 1.0 = full)
     float battery_level = 0.0f;
@@ -75,6 +79,7 @@ public:
         axes.fill(0.0f);
         gyro = {0.0f, 0.0f, 0.0f};
         accel = {0.0f, 0.0f, 0.0f};
+        touchpad = {};
         battery_level = 0.0f;
         is_charging = false;
         is_connected = false;
@@ -103,6 +108,23 @@ struct GCPAD_API Rumble {
     Rumble() = default;
     Rumble(uint8_t left, uint8_t right) : left_motor(left), right_motor(right) {}
 };
+
+// Single touchpad finger contact
+struct TouchPoint {
+    bool     active = false;
+    uint16_t x      = 0;    // 0..1919 (DS4/DualSense touchpad width)
+    uint16_t y      = 0;    // 0..941 (DS4) / 0..1079 (DualSense touchpad height)
+};
+
+// Sensor calibration scale factors (multiply raw int16 by these to get physical units)
+namespace calibration {
+    // Sony DS4 / DualSense: gyro ±2000 deg/s, accel ±4g
+    constexpr float SONY_GYRO_SCALE  = 2000.0f / 32768.0f;   // deg/s per LSB
+    constexpr float SONY_ACCEL_SCALE = 9.80665f / 8192.0f;   // m/s² per LSB
+    // Nintendo Pro Controller / Joy-Con: gyro ±2000 deg/s, accel ±8g
+    constexpr float NINTENDO_GYRO_SCALE  = 2000.0f / 32768.0f;   // deg/s per LSB
+    constexpr float NINTENDO_ACCEL_SCALE = 9.80665f / 4096.0f;   // m/s² per LSB
+} // namespace calibration
 
 // Remapper rules and API
 struct GCPAD_API Remapper {

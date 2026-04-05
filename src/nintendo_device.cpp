@@ -219,15 +219,15 @@ bool NintendoDevice::parse_standard_report(const std::vector<uint8_t>& report) {
     state_.axes[static_cast<size_t>(Axis::LeftTrigger)]  = state_.buttons[static_cast<size_t>(Button::L2)] ? 1.0f : 0.0f;
     state_.axes[static_cast<size_t>(Axis::RightTrigger)] = state_.buttons[static_cast<size_t>(Button::R2)] ? 1.0f : 0.0f;
 
-    // IMU data at bytes 13-24 (if present in 0x30 reports)
+    // IMU data at bytes 13-24 (if present in 0x30 reports), converted to physical units
     if (report[0] == 0x30 && report.size() >= 49) {
         // First sample (of 3) at bytes 13-24
-        state_.accel.x = static_cast<float>(static_cast<int16_t>(report[13] | (report[14] << 8)));
-        state_.accel.y = static_cast<float>(static_cast<int16_t>(report[15] | (report[16] << 8)));
-        state_.accel.z = static_cast<float>(static_cast<int16_t>(report[17] | (report[18] << 8)));
-        state_.gyro.x  = static_cast<float>(static_cast<int16_t>(report[19] | (report[20] << 8)));
-        state_.gyro.y  = static_cast<float>(static_cast<int16_t>(report[21] | (report[22] << 8)));
-        state_.gyro.z  = static_cast<float>(static_cast<int16_t>(report[23] | (report[24] << 8)));
+        state_.accel.x = static_cast<float>(static_cast<int16_t>(report[13] | (report[14] << 8))) * calibration::NINTENDO_ACCEL_SCALE;
+        state_.accel.y = static_cast<float>(static_cast<int16_t>(report[15] | (report[16] << 8))) * calibration::NINTENDO_ACCEL_SCALE;
+        state_.accel.z = static_cast<float>(static_cast<int16_t>(report[17] | (report[18] << 8))) * calibration::NINTENDO_ACCEL_SCALE;
+        state_.gyro.x  = static_cast<float>(static_cast<int16_t>(report[19] | (report[20] << 8))) * calibration::NINTENDO_GYRO_SCALE;
+        state_.gyro.y  = static_cast<float>(static_cast<int16_t>(report[21] | (report[22] << 8))) * calibration::NINTENDO_GYRO_SCALE;
+        state_.gyro.z  = static_cast<float>(static_cast<int16_t>(report[23] | (report[24] << 8))) * calibration::NINTENDO_GYRO_SCALE;
     }
 
     return true;
