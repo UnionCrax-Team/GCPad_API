@@ -29,6 +29,23 @@ enum class Axis {
     COUNT
 };
 
+// Single touchpad finger contact
+struct TouchPoint {
+    bool     active = false;
+    uint16_t x      = 0;    // 0..1919 (DS4/DualSense touchpad width)
+    uint16_t y      = 0;    // 0..941 (DS4) / 0..1079 (DualSense touchpad height)
+};
+
+// Sensor calibration scale factors (multiply raw int16 by these to get physical units)
+namespace calibration {
+    // Sony DS4 / DualSense: gyro ±2000 deg/s, accel ±4g
+    constexpr float SONY_GYRO_SCALE  = 2000.0f / 32768.0f;   // deg/s per LSB
+    constexpr float SONY_ACCEL_SCALE = 9.80665f / 8192.0f;   // m/s² per LSB
+    // Nintendo Pro Controller / Joy-Con: gyro ±2000 deg/s, accel ±8g
+    constexpr float NINTENDO_GYRO_SCALE  = 2000.0f / 32768.0f;   // deg/s per LSB
+    constexpr float NINTENDO_ACCEL_SCALE = 9.80665f / 4096.0f;   // m/s² per LSB
+} // namespace calibration
+
 // Gamepad state structure
 struct GCPAD_API GamepadState {
     // Digital buttons (true = pressed)
@@ -108,23 +125,6 @@ struct GCPAD_API Rumble {
     Rumble() = default;
     Rumble(uint8_t left, uint8_t right) : left_motor(left), right_motor(right) {}
 };
-
-// Single touchpad finger contact
-struct TouchPoint {
-    bool     active = false;
-    uint16_t x      = 0;    // 0..1919 (DS4/DualSense touchpad width)
-    uint16_t y      = 0;    // 0..941 (DS4) / 0..1079 (DualSense touchpad height)
-};
-
-// Sensor calibration scale factors (multiply raw int16 by these to get physical units)
-namespace calibration {
-    // Sony DS4 / DualSense: gyro ±2000 deg/s, accel ±4g
-    constexpr float SONY_GYRO_SCALE  = 2000.0f / 32768.0f;   // deg/s per LSB
-    constexpr float SONY_ACCEL_SCALE = 9.80665f / 8192.0f;   // m/s² per LSB
-    // Nintendo Pro Controller / Joy-Con: gyro ±2000 deg/s, accel ±8g
-    constexpr float NINTENDO_GYRO_SCALE  = 2000.0f / 32768.0f;   // deg/s per LSB
-    constexpr float NINTENDO_ACCEL_SCALE = 9.80665f / 4096.0f;   // m/s² per LSB
-} // namespace calibration
 
 // Remapper rules and API
 struct GCPAD_API Remapper {

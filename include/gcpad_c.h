@@ -62,7 +62,7 @@ extern "C" {
  * Snapshot of a single controller's state.
  * All fields are zeroed / false when the slot is empty.
  * buttons[GCPAD_BUTTON_TOUCHPAD] is the touchpad click button.
- * gyro_*/accel_* are in physical units (deg/s and m/s²).
+ * gyro_x/y/z and accel_x/y/z are in physical units (deg/s and m/s^2).
  */
 typedef struct GCPadStateC {
     uint8_t  buttons[GCPAD_BUTTON_COUNT]; /* 1 = pressed, 0 = released */
