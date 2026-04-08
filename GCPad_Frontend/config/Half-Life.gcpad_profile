@@ -1,0 +1,33 @@
+# GCPad Mapping Profile
+# Half-Life (GoldSrc) — Classic FPS layout
+name=Half-Life
+
+# Button -> Key mappings
+button_key A 0x20 # Space (Jump)
+button_key B 0xa2 # Left Ctrl (Crouch)
+button_key X 0x52 # R (Reload)
+button_key Y 0x45 # E (Use)
+button_key L1 0x51 # Q (Last weapon)
+button_key R1 0x46 # F (Flashlight)
+button_key L3 0xa0 # Left Shift (Walk)
+button_key R3 0x47 # G (Spray)
+button_key DPad Up 0x31 # 1 (Crowbar / melee)
+button_key DPad Rt 0x32 # 2 (Pistols)
+button_key DPad Dn 0x33 # 3 (Shotguns / SMG)
+button_key DPad Lt 0x34 # 4 (Explosives)
+button_key Start 0x1b # Escape (Menu)
+button_key Select 0x09 # Tab (Scoreboard)
+
+# Axis -> Key mappings (threshold-based)
+axis_key LY 0x57 thr=0.5 neg=1 # W (Forward)
+axis_key LY 0x53 thr=0.5 neg=0 # S (Backward)
+axis_key LX 0x41 thr=0.5 neg=1 # A (Strafe left)
+axis_key LX 0x44 thr=0.5 neg=0 # D (Strafe right)
+
+# Axis -> Mouse motion mappings (right stick = look)
+axis_mouse RX sens=14.0 dz=0.12 inv=false curve=2.0
+axis_mouse RY sens=14.0 dz=0.12 inv=false curve=2.0
+
+# Axis -> Mouse Button mappings (triggers = fire)
+axis_mbtn RT LMB thr=0.3 # Primary fire
+axis_mbtn LT RMB thr=0.3 # Secondary fire

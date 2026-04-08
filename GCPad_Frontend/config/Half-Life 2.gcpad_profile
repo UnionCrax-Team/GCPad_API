@@ -1,0 +1,34 @@
+# GCPad Mapping Profile
+# Half-Life 2 (Source) — Includes sprint, suit zoom, gravity gun
+name=Half-Life 2
+
+# Button -> Key mappings
+button_key A 0x20 # Space (Jump)
+button_key B 0xa2 # Left Ctrl (Crouch)
+button_key X 0x52 # R (Reload)
+button_key Y 0x45 # E (Use / pick up)
+button_key L1 0x46 # F (Flashlight)
+button_key R1 0x51 # Q (Last weapon / quick-switch)
+button_key L3 0xa0 # Left Shift (Sprint)
+button_key R3 0x5a # Z (Suit zoom)
+button_key DPad Up 0x31 # 1 (Crowbar / gravity gun)
+button_key DPad Rt 0x32 # 2 (Pistol / magnum)
+button_key DPad Dn 0x33 # 3 (SMG / pulse rifle)
+button_key DPad Lt 0x34 # 4 (Shotgun / crossbow)
+button_key Start 0x1b # Escape (Menu)
+button_key Select 0x09 # Tab (Scoreboard)
+button_key Guide 0x35 # 5 (RPG / grenades)
+
+# Axis -> Key mappings (threshold-based)
+axis_key LY 0x57 thr=0.5 neg=1 # W (Forward)
+axis_key LY 0x53 thr=0.5 neg=0 # S (Backward)
+axis_key LX 0x41 thr=0.5 neg=1 # A (Strafe left)
+axis_key LX 0x44 thr=0.5 neg=0 # D (Strafe right)
+
+# Axis -> Mouse motion mappings (right stick = look)
+axis_mouse RX sens=16.0 dz=0.10 inv=false curve=2.2
+axis_mouse RY sens=16.0 dz=0.10 inv=false curve=2.2
+
+# Axis -> Mouse Button mappings (triggers = fire)
+axis_mbtn RT LMB thr=0.25 # Primary fire / gravity gun grab
+axis_mbtn LT RMB thr=0.25 # Secondary fire / gravity gun punt
