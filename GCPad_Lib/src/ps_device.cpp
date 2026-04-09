@@ -33,6 +33,8 @@ public:
 
     bool setLED(const Color& color) override;
     bool setRumble(const Rumble& rumble) override;
+    bool setTriggerEffect(bool right_trigger, const TriggerEffect& effect) override;
+    bool setPlayerLEDs(uint8_t led_mask) override;
 
     void setRemapper(std::shared_ptr<Remapper> remapper) override;
 
@@ -54,6 +56,9 @@ private:
     // Store last output values for combined LED+rumble reports
     Color last_color_;
     Rumble last_rumble_;
+    TriggerEffect last_right_trigger_effect_;
+    TriggerEffect last_left_trigger_effect_;
+    uint8_t last_player_leds_ = 0;
 
     // Internal methods
     bool detect_device_type();
@@ -176,6 +181,31 @@ bool PlayStationDevice::setRumble(const Rumble& rumble) {
             ? create_dualsense_output_usb(last_color_, rumble)
             : create_dualsense_output_bt(last_color_, rumble);
     }
+    return hid_device_->write(report);
+}
+
+bool PlayStationDevice::setTriggerEffect(bool right_trigger, const TriggerEffect& effect) {
+    if (!connected_ || model_ != ControllerModel::DualSense) return false;
+    if (right_trigger) {
+        last_right_trigger_effect_ = effect;
+    } else {
+        last_left_trigger_effect_ = effect;
+    }
+    // Send a full output report with current state
+    std::vector<uint8_t> report;
+    report = (connection_type_ == ConnectionType::USB)
+        ? create_dualsense_output_usb(last_color_, last_rumble_)
+        : create_dualsense_output_bt(last_color_, last_rumble_);
+    return hid_device_->write(report);
+}
+
+bool PlayStationDevice::setPlayerLEDs(uint8_t led_mask) {
+    if (!connected_ || model_ != ControllerModel::DualSense) return false;
+    last_player_leds_ = led_mask & 0x1F; // 5 LEDs
+    std::vector<uint8_t> report;
+    report = (connection_type_ == ConnectionType::USB)
+        ? create_dualsense_output_usb(last_color_, last_rumble_)
+        : create_dualsense_output_bt(last_color_, last_rumble_);
     return hid_device_->write(report);
 }
 
@@ -506,13 +536,46 @@ std::vector<uint8_t> PlayStationDevice::create_ds4_output_bt(const Color& color,
 
 std::vector<uint8_t> PlayStationDevice::create_dualsense_output_usb(const Color& color, const Rumble& rumble) {
     // DualSense USB output report: Report ID 0x02, 48 bytes
+    // Byte  0: Report ID (0x02)
+    // Byte  1: Valid flags 0 — bit0: compatible rumble, bit1: haptics, bit2: R2 trigger, bit3: L2 trigger
+    // Byte  2: Valid flags 1 — bit0: mic LED, bit2: lightbar, bit4: player LEDs
+    // Byte  3: Right haptic motor
+    // Byte  4: Left haptic motor
+    // Bytes 11-21: Right trigger effect
+    // Bytes 22-32: Left trigger effect
+    // Byte  39: Player LED brightness (0=high, 1=mid, 2=low)
+    // Byte  44: Player LED bitmask (5 bits)
+    // Bytes 45-47: Lightbar R, G, B
     std::vector<uint8_t> report(48, 0);
-    report[0] = 0x02;      // Report ID
-    report[1] = 0xFF;      // Valid flags byte 0 (enable rumble + haptics)
-    report[2] = 0x01 | 0x02 | 0x04; // Valid flags byte 1 (lightbar + player LEDs)
-    report[3] = rumble.right_motor;  // Right haptic
-    report[4] = rumble.left_motor;   // Left haptic
-    // Lightbar color at bytes 45-47
+    report[0] = 0x02;
+    report[1] = 0x01 | 0x02  // Enable compatible rumble + haptics
+              | 0x04 | 0x08; // Enable R2 + L2 trigger effects
+    report[2] = 0x04          // Enable lightbar
+              | 0x10;         // Enable player LEDs
+    report[3] = rumble.right_motor;
+    report[4] = rumble.left_motor;
+
+    // Right trigger effect (bytes 11-17)
+    report[11] = static_cast<uint8_t>(last_right_trigger_effect_.mode);
+    report[12] = last_right_trigger_effect_.start;
+    report[13] = last_right_trigger_effect_.end;
+    report[14] = last_right_trigger_effect_.force;
+    report[15] = last_right_trigger_effect_.param1;
+    report[16] = last_right_trigger_effect_.param2;
+
+    // Left trigger effect (bytes 22-28)
+    report[22] = static_cast<uint8_t>(last_left_trigger_effect_.mode);
+    report[23] = last_left_trigger_effect_.start;
+    report[24] = last_left_trigger_effect_.end;
+    report[25] = last_left_trigger_effect_.force;
+    report[26] = last_left_trigger_effect_.param1;
+    report[27] = last_left_trigger_effect_.param2;
+
+    // Player LEDs
+    report[39] = 0x00; // Brightness: high
+    report[44] = last_player_leds_;
+
+    // Lightbar color
     report[45] = color.r;
     report[46] = color.g;
     report[47] = color.b;
@@ -521,14 +584,36 @@ std::vector<uint8_t> PlayStationDevice::create_dualsense_output_usb(const Color&
 
 std::vector<uint8_t> PlayStationDevice::create_dualsense_output_bt(const Color& color, const Rumble& rumble) {
     // DualSense BT output report: Report ID 0x31, 78 bytes
+    // Same layout as USB but shifted +1 (byte 1 = BT sequence tag, data starts at byte 2)
     std::vector<uint8_t> report(78, 0);
     report[0] = 0x31;
     report[1] = 0x02;      // BT sequence tag
-    report[2] = 0xFF;      // Valid flags byte 0
-    report[3] = 0x01 | 0x02 | 0x04; // Valid flags byte 1
+    report[2] = 0x01 | 0x02 | 0x04 | 0x08; // Valid flags 0
+    report[3] = 0x04 | 0x10;                // Valid flags 1
     report[4] = rumble.right_motor;
     report[5] = rumble.left_motor;
-    // Lightbar color at bytes 46-48
+
+    // Right trigger effect (bytes 12-18, offset +1 from USB)
+    report[12] = static_cast<uint8_t>(last_right_trigger_effect_.mode);
+    report[13] = last_right_trigger_effect_.start;
+    report[14] = last_right_trigger_effect_.end;
+    report[15] = last_right_trigger_effect_.force;
+    report[16] = last_right_trigger_effect_.param1;
+    report[17] = last_right_trigger_effect_.param2;
+
+    // Left trigger effect (bytes 23-29, offset +1 from USB)
+    report[23] = static_cast<uint8_t>(last_left_trigger_effect_.mode);
+    report[24] = last_left_trigger_effect_.start;
+    report[25] = last_left_trigger_effect_.end;
+    report[26] = last_left_trigger_effect_.force;
+    report[27] = last_left_trigger_effect_.param1;
+    report[28] = last_left_trigger_effect_.param2;
+
+    // Player LEDs
+    report[40] = 0x00; // Brightness: high
+    report[45] = last_player_leds_;
+
+    // Lightbar color
     report[46] = color.r;
     report[47] = color.g;
     report[48] = color.b;

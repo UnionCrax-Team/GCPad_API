@@ -126,6 +126,48 @@ struct GCPAD_API Rumble {
     Rumble(uint8_t left, uint8_t right) : left_motor(left), right_motor(right) {}
 };
 
+// DualSense adaptive trigger effect (L2 / R2)
+struct GCPAD_API TriggerEffect {
+    // Effect modes
+    enum class Mode : uint8_t {
+        Off          = 0x00,  // No resistance
+        Rigid        = 0x01,  // Constant resistance from start to end
+        Pulse        = 0x02,  // Pulsing / vibrating resistance
+        Calibration  = 0x21,  // Calibration mode (internal)
+        SemiRigid    = 0x25,  // Resistance that eases off
+        Vibrating    = 0x26,  // Vibrating effect
+    };
+
+    Mode  mode      = Mode::Off;
+    uint8_t start   = 0;     // Start position (0-255, 0 = fully released)
+    uint8_t end     = 0;     // End position (0-255)
+    uint8_t force   = 0;     // Force / strength (0-255)
+    uint8_t param1  = 0;     // Mode-specific parameter
+    uint8_t param2  = 0;     // Mode-specific parameter
+
+    TriggerEffect() = default;
+
+    // Convenience factory: constant resistance from start to end
+    static TriggerEffect Resistance(uint8_t start_pos, uint8_t force_val) {
+        TriggerEffect e;
+        e.mode  = Mode::Rigid;
+        e.start = start_pos;
+        e.end   = 255;
+        e.force = force_val;
+        return e;
+    }
+
+    // Convenience factory: vibrating trigger
+    static TriggerEffect Vibration(uint8_t start_pos, uint8_t amplitude, uint8_t frequency) {
+        TriggerEffect e;
+        e.mode   = Mode::Vibrating;
+        e.start  = start_pos;
+        e.force  = amplitude;
+        e.param1 = frequency;
+        return e;
+    }
+};
+
 // Remapper rules and API
 struct GCPAD_API Remapper {
     std::array<Button, static_cast<size_t>(Button::COUNT)> button_map;

@@ -146,6 +146,32 @@ int gcpad_set_led(GCPadManagerHandle mgr, int slot,
     return dev->setLED({ r, g, b }) ? 1 : 0;
 }
 
+// ── DualSense-specific ───────────────────────────────────────────────────────
+
+int gcpad_set_trigger_effect(GCPadManagerHandle mgr, int slot,
+                              int right_trigger, uint8_t mode,
+                              uint8_t start, uint8_t end,
+                              uint8_t force, uint8_t param1, uint8_t param2) {
+    if (!mgr) return 0;
+    gcpad::GamepadDevice* dev = to_wrapper(mgr)->mgr->getGamepad(slot);
+    if (!dev || !dev->isConnected()) return 0;
+    gcpad::TriggerEffect effect;
+    effect.mode   = static_cast<gcpad::TriggerEffect::Mode>(mode);
+    effect.start  = start;
+    effect.end    = end;
+    effect.force  = force;
+    effect.param1 = param1;
+    effect.param2 = param2;
+    return dev->setTriggerEffect(right_trigger != 0, effect) ? 1 : 0;
+}
+
+int gcpad_set_player_leds(GCPadManagerHandle mgr, int slot, uint8_t led_mask) {
+    if (!mgr) return 0;
+    gcpad::GamepadDevice* dev = to_wrapper(mgr)->mgr->getGamepad(slot);
+    if (!dev || !dev->isConnected()) return 0;
+    return dev->setPlayerLEDs(led_mask) ? 1 : 0;
+}
+
 // ── Hotplug callbacks ─────────────────────────────────────────────────────────
 
 void gcpad_set_connected_callback(GCPadManagerHandle mgr,

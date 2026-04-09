@@ -30,6 +30,10 @@ public:
     virtual bool setLED(const Color& color) = 0;
     virtual bool setRumble(const Rumble& rumble) = 0;
 
+    // DualSense-specific (returns false on non-DualSense controllers)
+    virtual bool setTriggerEffect(bool right_trigger, const TriggerEffect& effect) { (void)right_trigger; (void)effect; return false; }
+    virtual bool setPlayerLEDs(uint8_t led_mask) { (void)led_mask; return false; }
+
     // Remapping support
     virtual void setRemapper(std::shared_ptr<Remapper> remapper) = 0;
     virtual GamepadState getRemappedState() const = 0;

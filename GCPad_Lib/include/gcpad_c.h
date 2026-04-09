@@ -142,6 +142,25 @@ GCPAD_C_API int gcpad_set_rumble(GCPadManagerHandle mgr, int slot,
 GCPAD_C_API int gcpad_set_led(GCPadManagerHandle mgr, int slot,
                                uint8_t r, uint8_t g, uint8_t b);
 
+/**
+ * Set an adaptive trigger effect on a DualSense controller.
+ * right_trigger: 1 = R2, 0 = L2.
+ * mode: 0x00=Off, 0x01=Rigid, 0x02=Pulse, 0x25=SemiRigid, 0x26=Vibrating.
+ * Returns 1 on success, 0 if the controller doesn't support it.
+ */
+GCPAD_C_API int gcpad_set_trigger_effect(GCPadManagerHandle mgr, int slot,
+                                          int right_trigger, uint8_t mode,
+                                          uint8_t start, uint8_t end,
+                                          uint8_t force, uint8_t param1, uint8_t param2);
+
+/**
+ * Set the player indicator LEDs on a DualSense controller.
+ * led_mask: 5-bit mask (bit 0 = leftmost LED, bit 4 = rightmost).
+ *   Player 1 = 0x04, Player 2 = 0x0A, Player 3 = 0x15, Player 4 = 0x1B.
+ * Returns 1 on success, 0 if the controller doesn't support it.
+ */
+GCPAD_C_API int gcpad_set_player_leds(GCPadManagerHandle mgr, int slot, uint8_t led_mask);
+
 /* ── Hotplug callbacks ──────────────────────────────────────────────────────── */
 
 /**
