@@ -1,4 +1,4 @@
-#include "include/gamepad_input_remapper.h"
+#include "gamepad_input_remapper.h"
 
 #include <cmath>
 #include <algorithm>

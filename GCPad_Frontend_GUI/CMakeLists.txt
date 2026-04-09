@@ -41,11 +41,12 @@ if(WIN32)
     # Use the vendored SDL2 from GCPad_Lib
     set(SDL2_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/GCPad_Lib/vendor/SDL2)
     set(SDL2_LIBRARY     ${CMAKE_SOURCE_DIR}/GCPad_Lib/libs/SDL2.lib)
-    target_include_directories(imgui_lib PUBLIC ${SDL2_INCLUDE_DIR}/..)
+    target_include_directories(imgui_lib PUBLIC ${SDL2_INCLUDE_DIR})
 else()
     # On Linux, use system SDL2
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    target_include_directories(imgui_lib PUBLIC ${SDL2_INCLUDE_DIRS})
     target_link_libraries(imgui_lib PUBLIC PkgConfig::SDL2)
 endif()
 
