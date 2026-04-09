@@ -1,11 +1,15 @@
 #include "GamepadManager.h"
+#include "sdl_device.h"
+
+#ifdef _WIN32
 #include "hid_device.h"
 #include "ps_device.h"
 #include "xbox_device.h"
 #include "nintendo_device.h"
 #include "xinput_device.h"
 #include "dinput_device.h"
-#include "sdl_device.h"
+#endif
+
 #include <thread>
 #include <atomic>
 #include <mutex>
@@ -59,27 +63,32 @@ private:
 
     // Internal methods
     void hotplug_detection_loop();
-    void check_for_new_devices();
     void check_for_disconnected_devices();
-    void check_for_xinput_devices();
-    void check_for_dinput_devices();
     void check_for_sdl_devices();
     int find_available_slot() const;
     int find_slot_for_path(const std::string& path) const;
+    void apply_remapper_to_all();
+
+#ifdef _WIN32
+    void check_for_new_devices();
+    void check_for_xinput_devices();
+    void check_for_dinput_devices();
     bool is_xinput_slot(int slot) const;
     bool is_supported_device(uint16_t vendor_id, uint16_t product_id) const;
     std::unique_ptr<GamepadDevice> create_device(std::unique_ptr<internal::HidDevice> hid_device, const internal::HidDeviceAttributes& attributes, int slot);
-    void apply_remapper_to_all();
 
     // Track which XInput indices are already assigned
-    int xinput_slot_map_[4] = {-1, -1, -1, -1}; // XInput index -> slot
+    int xinput_slot_map_[4] = {-1, -1, -1, -1};
 
-    // Track DInput/SDL instance IDs to avoid re-adding
-    std::set<std::string> dinput_guids_;  // Set of connected DInput GUIDs
-    std::set<int> sdl_indices_;           // Set of connected SDL joystick indices
+    // Track DInput instance IDs to avoid re-adding
+    std::set<std::string> dinput_guids_;
 
     // Subsystem init state
     bool dinput_initialized_ = false;
+#endif
+
+    // Track SDL instance IDs to avoid re-adding
+    std::set<int> sdl_indices_;
     bool sdl_initialized_ = false;
 };
 
@@ -96,6 +105,7 @@ GamepadManagerImpl::~GamepadManagerImpl() {
 bool GamepadManagerImpl::initialize() {
     std::lock_guard<std::mutex> lock(mutex_);
 
+#ifdef _WIN32
     auto hid_devices = internal::enumerate_hid_devices();
 
     for (auto& hid_device : hid_devices) {
@@ -144,8 +154,9 @@ bool GamepadManagerImpl::initialize() {
     if (dinput_initialized_) {
         check_for_dinput_devices();
     }
+#endif
 
-    // Initialize SDL2 and scan for any remaining controllers
+    // Initialize SDL2 and scan for controllers (primary backend on Linux)
     sdl_initialized_ = internal::initializeSDL();
     if (sdl_initialized_) {
         check_for_sdl_devices();
@@ -173,18 +184,22 @@ void GamepadManagerImpl::shutdown() {
         gamepad.reset();
     }
     std::fill(connected_device_paths_.begin(), connected_device_paths_.end(), std::string());
-    dinput_guids_.clear();
     sdl_indices_.clear();
+#ifdef _WIN32
+    dinput_guids_.clear();
+#endif
 
     // Shutdown subsystems
     if (sdl_initialized_) {
         internal::shutdownSDL();
         sdl_initialized_ = false;
     }
+#ifdef _WIN32
     if (dinput_initialized_) {
         internal::shutdownDInput();
         dinput_initialized_ = false;
     }
+#endif
 }
 
 int GamepadManagerImpl::getConnectedGamepadCount() const {
@@ -276,14 +291,17 @@ void GamepadManagerImpl::hotplug_detection_loop() {
 
         std::lock_guard<std::mutex> lock(mutex_);
 
+#ifdef _WIN32
         check_for_new_devices();
         check_for_xinput_devices();
         if (dinput_initialized_) check_for_dinput_devices();
+#endif
         if (sdl_initialized_) check_for_sdl_devices();
         check_for_disconnected_devices();
     }
 }
 
+#ifdef _WIN32
 void GamepadManagerImpl::check_for_new_devices() {
     auto hid_devices = internal::enumerate_hid_devices();
 
@@ -293,7 +311,6 @@ void GamepadManagerImpl::check_for_new_devices() {
             continue;
         }
 
-        // Must open device before reading attributes
         if (!hid_device->open()) {
             continue;
         }
@@ -310,7 +327,6 @@ void GamepadManagerImpl::check_for_new_devices() {
             continue;
         }
 
-        // Close before handing to device (device re-opens in updateState)
         hid_device->close();
 
         gamepads_[slot] = create_device(std::move(hid_device), attributes, slot);
@@ -392,6 +408,8 @@ void GamepadManagerImpl::check_for_dinput_devices() {
     }
 }
 
+#endif // _WIN32
+
 void GamepadManagerImpl::check_for_sdl_devices() {
     auto sdl_devices = internal::enumerateSDLDevices();
 
@@ -429,6 +447,7 @@ void GamepadManagerImpl::check_for_sdl_devices() {
 void GamepadManagerImpl::check_for_disconnected_devices() {
     for (int i = 0; i < MAX_GAMEPADS; ++i) {
         if (gamepads_[i] && !gamepads_[i]->isConnected()) {
+#ifdef _WIN32
             // Clear XInput slot mapping if applicable
             for (int xi = 0; xi < 4; ++xi) {
                 if (xinput_slot_map_[xi] == i) {
@@ -438,11 +457,13 @@ void GamepadManagerImpl::check_for_disconnected_devices() {
             }
 
             // Clear DInput GUID tracking
-            const auto& path = connected_device_paths_[i];
-            if (path.rfind("dinput:", 0) == 0) {
-                dinput_guids_.erase(path.substr(7));
+            const auto& path_win = connected_device_paths_[i];
+            if (path_win.rfind("dinput:", 0) == 0) {
+                dinput_guids_.erase(path_win.substr(7));
             }
+#endif
             // Clear SDL index tracking
+            const auto& path = connected_device_paths_[i];
             if (path.rfind("sdl:", 0) == 0) {
                 try { sdl_indices_.erase(std::stoi(path.substr(4))); } catch (...) {}
             }
@@ -474,6 +495,7 @@ int GamepadManagerImpl::find_slot_for_path(const std::string& path) const {
     return -1;
 }
 
+#ifdef _WIN32
 bool GamepadManagerImpl::is_supported_device(uint16_t vendor_id, uint16_t product_id) const {
     auto ps_infos = internal::getPlayStationDeviceInfos();
     for (const auto& info : ps_infos) {
@@ -524,6 +546,7 @@ std::unique_ptr<GamepadDevice> GamepadManagerImpl::create_device(std::unique_ptr
 
     return nullptr;
 }
+#endif // _WIN32
 
 // Factory function
 std::unique_ptr<GamepadManager> GamepadManager::create() {
@@ -537,23 +560,17 @@ std::unique_ptr<GamepadManager> createGamepadManager() {
 
 std::vector<HidDeviceInfo> getAllHidDevices() {
     std::vector<HidDeviceInfo> infos;
-    // Enumerate ALL HID devices
+#ifdef _WIN32
     auto devices = internal::enumerate_hid_devices();
-    
+
     for (auto& dev : devices) {
-        if (!dev->open()) {
-            continue;
-        }
+        if (!dev->open()) continue;
 
         auto attrs = dev->get_attributes();
         std::string product_str = dev->get_product_string();
-
         dev->close();
 
-        if (attrs.vendor_id == 0 && attrs.product_id == 0) {
-            // Ignore non-controller or generic HID endpoints
-            continue;
-        }
+        if (attrs.vendor_id == 0 && attrs.product_id == 0) continue;
 
         infos.push_back({
             attrs.vendor_id,
@@ -562,6 +579,7 @@ std::vector<HidDeviceInfo> getAllHidDevices() {
             dev->device_path()
         });
     }
+#endif
     return infos;
 }
 

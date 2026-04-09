@@ -27,6 +27,7 @@ jobs:
           -G "Visual Studio 17 2022"
           -A x64
           -DGCPAD_BUILD_FRONTEND=ON
+          -DGCPAD_BUILD_FRONTEND_GUI=ON
           -DGCPAD_BUILD_REMAP=ON
 
       - name: Build
@@ -55,9 +56,19 @@ jobs:
         with:
           name: gcpad-frontend-${{ matrix.config }}
           path: |
-            build/GCPad_Frontend/${{ matrix.config }}/gcpad_frontend.exe
-            build/GCPad_Frontend/${{ matrix.config }}/gcpad.dll
-            build/GCPad_Frontend/${{ matrix.config }}/SDL2.dll
+            build/GCPad_Frontend_CMD/${{ matrix.config }}/GCPad_Frontend_CMD.exe
+            build/GCPad_Frontend_CMD/${{ matrix.config }}/gcpad.dll
+            build/GCPad_Frontend_CMD/${{ matrix.config }}/SDL2.dll
+          if-no-files-found: warn
+
+      - name: Upload GCPad_Frontend_GUI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcpad-frontend-gui-${{ matrix.config }}
+          path: |
+            build/GCPad_Frontend_GUI/${{ matrix.config }}/GCPad_Frontend_GUI.exe
+            build/GCPad_Frontend_GUI/${{ matrix.config }}/gcpad.dll
+            build/GCPad_Frontend_GUI/${{ matrix.config }}/SDL2.dll
           if-no-files-found: warn
 
   # ── GitHub Release (version tags only) ────────────────────────────────────
@@ -78,6 +89,7 @@ jobs:
           -G "Visual Studio 17 2022"
           -A x64
           -DGCPAD_BUILD_FRONTEND=ON
+          -DGCPAD_BUILD_FRONTEND_GUI=ON
           -DGCPAD_BUILD_REMAP=ON
 
       - name: Build Release
@@ -97,8 +109,11 @@ jobs:
           Copy-Item build/GCPad_Remap/Release/gcpad_remap.lib release-assets/gcpad_remap.lib
 
           # Frontend (with DLLs copied by POST_BUILD)
-          Copy-Item build/GCPad_Frontend/Release/gcpad_frontend.exe release-assets/gcpad_frontend.exe
-          Copy-Item build/GCPad_Frontend/Release/SDL2.dll           release-assets/SDL2.dll
+          Copy-Item build/GCPad_Frontend_CMD/Release/GCPad_Frontend_CMD.exe release-assets/GCPad_Frontend_CMD.exe
+          Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll           release-assets/SDL2.dll
+
+          # GUI Frontend
+          Copy-Item build/GCPad_Frontend_GUI/Release/GCPad_Frontend_GUI.exe release-assets/GCPad_Frontend_GUI.exe
 
           # Bundle public headers for library consumers
           New-Item -ItemType Directory -Force release-assets/include
@@ -112,7 +127,7 @@ jobs:
           Copy-Item build/GCPad_Lib/Release/gcpad.dll               release-assets/unioncrax-direct/gcpad.dll
           Copy-Item build/GCPad_Lib/Release/gcpad.lib               release-assets/unioncrax-direct/gcpad.lib
           Copy-Item build/GCPad_Remap/Release/gcpad_remap.lib       release-assets/unioncrax-direct/gcpad_remap.lib
-          Copy-Item build/GCPad_Frontend/Release/SDL2.dll            release-assets/unioncrax-direct/SDL2.dll
+          Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll            release-assets/unioncrax-direct/SDL2.dll
           New-Item -ItemType Directory -Force release-assets/unioncrax-direct/include
           Copy-Item GCPad_Lib/include/*    release-assets/unioncrax-direct/include/
           Copy-Item GCPad_Remap/include/*  release-assets/unioncrax-direct/include/

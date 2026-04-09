@@ -1,11 +1,17 @@
-#include "gamepad_input_remapper.h"
+#include "include/gamepad_input_remapper.h"
 
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#elif defined(__linux__)
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/extensions/XTest.h>
+#include <X11/XKBlib.h>
 #endif
 
 namespace gcpad {
@@ -419,6 +425,60 @@ bool GamepadInputRemapper::sendInput(const GamepadState& current,
     }
 
     return true;
+#elif defined(__linux__)
+    static Display* display = XOpenDisplay(nullptr);
+    if (!display) {
+        return false;
+    }
+
+    Window root = DefaultRootWindow(display);
+    Window focus;
+    int revert_to;
+    XGetInputFocus(display, &focus, &revert_to);
+
+    for (const auto& e : events) {
+        switch (e.type) {
+            case GamepadInputEvent::Type::Keyboard: {
+                KeyCode keycode = static_cast<KeyCode>(e.keyboard.virtual_key);
+                if (e.keyboard.pressed) {
+                    XTestFakeKeyEvent(display, keycode, True, CurrentTime);
+                    XTestFakeKeyEvent(display, keycode, False, CurrentTime);
+                }
+                break;
+            }
+            case GamepadInputEvent::Type::MouseButton: {
+                unsigned int button;
+                switch (e.mouse_button.button) {
+                    case MouseButton::Left: button = Button1; break;
+                    case MouseButton::Right: button = Button2; break;
+                    case MouseButton::Middle: button = Button3; break;
+                    default: continue;
+                }
+                XTestFakeButtonEvent(display, button,
+                    e.mouse_button.pressed ? True : False, CurrentTime);
+                break;
+            }
+            case GamepadInputEvent::Type::MouseMove: {
+                XTestFakeRelativeMotionEvent(display,
+                    static_cast<double>(e.mouse_move.dx),
+                    static_cast<double>(e.mouse_move.dy),
+                    CurrentTime);
+                break;
+            }
+            case GamepadInputEvent::Type::MouseWheel: {
+                int direction = (e.mouse_wheel.delta > 0) ? 4 : 5;
+                int count = std::abs(e.mouse_wheel.delta) / 120;
+                for (int i = 0; i < count; ++i) {
+                    XTestFakeButtonEvent(display, direction, True, CurrentTime);
+                    XTestFakeButtonEvent(display, direction, False, CurrentTime);
+                }
+                break;
+            }
+        }
+    }
+
+    XFlush(display);
+    return true;
 #else
     (void)events;
     return false;
@@ -443,6 +503,22 @@ std::string GamepadInputRemapper::virtualKeyName(uint16_t vk) {
     int len = GetKeyNameTextA(lparam, name, sizeof(name));
     if (len > 0) {
         return std::string(name, static_cast<size_t>(len));
+    }
+    char buf[32];
+    snprintf(buf, sizeof(buf), "VK_0x%02X", vk);
+    return buf;
+#elif defined(__linux__)
+    static Display* display = XOpenDisplay(nullptr);
+    if (!display) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "VK_0x%02X", vk);
+        return buf;
+    }
+    KeyCode keycode = static_cast<KeyCode>(vk);
+    KeySym keysym = XKeycodeToKeysym(display, keycode, 0);
+    const char* name = XKeysymToString(keysym);
+    if (name) {
+        return std::string(name);
     }
     char buf[32];
     snprintf(buf, sizeof(buf), "VK_0x%02X", vk);

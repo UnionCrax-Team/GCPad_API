@@ -4,10 +4,18 @@
 #include <array>
 #include <chrono>
 
-#ifdef GCPAD_API_EXPORTS
-#define GCPAD_API __declspec(dllexport)
+#ifdef _WIN32
+  #ifdef GCPAD_API_EXPORTS
+    #define GCPAD_API __declspec(dllexport)
+  #else
+    #define GCPAD_API __declspec(dllimport)
+  #endif
 #else
-#define GCPAD_API __declspec(dllimport)
+  #ifdef GCPAD_API_EXPORTS
+    #define GCPAD_API __attribute__((visibility("default")))
+  #else
+    #define GCPAD_API
+  #endif
 #endif
 
 namespace gcpad {

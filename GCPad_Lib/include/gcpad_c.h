@@ -21,7 +21,11 @@ extern "C" {
 #    define GCPAD_C_API __declspec(dllimport)
 #  endif
 #else
-#  define GCPAD_C_API
+#  ifdef GCPAD_API_EXPORTS
+#    define GCPAD_C_API __attribute__((visibility("default")))
+#  else
+#    define GCPAD_C_API
+#  endif
 #endif
 
 #include <stdint.h>
