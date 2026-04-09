@@ -62,8 +62,7 @@ target_link_libraries(GCPad_Frontend_GUI PRIVATE gcpad gcpad_remap imgui_lib)
 
 if(WIN32)
     target_link_directories(GCPad_Frontend_GUI PRIVATE ${CMAKE_SOURCE_DIR}/GCPad_Lib/libs)
-    target_link_libraries(GCPad_Frontend_GUI PRIVATE SDL2 SDL2main)
-    # Hide console window on Windows Release builds
+    target_link_libraries(GCPad_Frontend_GUI PRIVATE SDL2)
     set_target_properties(GCPad_Frontend_GUI PROPERTIES WIN32_EXECUTABLE $<CONFIG:Release>)
 else()
     find_package(PkgConfig REQUIRED)
