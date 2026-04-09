@@ -632,7 +632,7 @@ int main(int, char**) {
         ImGui::Render();
         SDL_SetRenderDrawColor(renderer, 20, 20, 26, 255);
         SDL_RenderClear(renderer);
-        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetRenderData(), renderer);
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
     }
 
