@@ -58,7 +58,6 @@ jobs:
           path: |
             build/GCPad_Frontend_CMD/${{ matrix.config }}/GCPad_Frontend_CMD.exe
             build/GCPad_Frontend_CMD/${{ matrix.config }}/gcpad.dll
-            build/GCPad_Frontend_CMD/${{ matrix.config }}/gcpad_remap.dll
             build/GCPad_Frontend_CMD/${{ matrix.config }}/SDL2.dll
           if-no-files-found: warn
 
@@ -69,7 +68,6 @@ jobs:
           path: |
             build/GCPad_Frontend_GUI/${{ matrix.config }}/GCPad_Frontend_GUI.exe
             build/GCPad_Frontend_GUI/${{ matrix.config }}/gcpad.dll
-            build/GCPad_Frontend_GUI/${{ matrix.config }}/gcpad_remap.dll
             build/GCPad_Frontend_GUI/${{ matrix.config }}/SDL2.dll
           if-no-files-found: warn
 
@@ -107,16 +105,12 @@ jobs:
           Copy-Item build/GCPad_Lib/Release/gcpad.dll       release-assets/gcpad.dll
           Copy-Item build/GCPad_Lib/Release/gcpad.lib       release-assets/gcpad.lib
 
-          # Remap static lib
-          Copy-Item build/GCPad_Remap/Release/gcpad_remap.lib release-assets/gcpad_remap.lib
-
           # Frontend (with DLLs copied by POST_BUILD)
           Copy-Item build/GCPad_Frontend_CMD/Release/GCPad_Frontend_CMD.exe release-assets/GCPad_Frontend_CMD.exe
           Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll           release-assets/SDL2.dll
 
           # GUI Frontend
           Copy-Item build/GCPad_Frontend_GUI/Release/GCPad_Frontend_GUI.exe release-assets/GCPad_Frontend_GUI.exe
-          Copy-Item build/GCPad_Frontend_GUI/Release/gcpad_remap.dll release-assets/gcpad_remap.dll
           # Bundle public headers for library consumers
           New-Item -ItemType Directory -Force release-assets/include
           Copy-Item GCPad_Lib/include/*    release-assets/include/
@@ -128,9 +122,7 @@ jobs:
           New-Item -ItemType Directory -Force release-assets/unioncrax-direct
           Copy-Item build/GCPad_Lib/Release/gcpad.dll               release-assets/unioncrax-direct/gcpad.dll
           Copy-Item build/GCPad_Lib/Release/gcpad.lib               release-assets/unioncrax-direct/gcpad.lib
-          Copy-Item build/GCPad_Remap/Release/gcpad_remap.lib       release-assets/unioncrax-direct/gcpad_remap.lib
           Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll            release-assets/unioncrax-direct/SDL2.dll
-          Copy-Item build/GCPad_Frontend_GUI/Release/gcpad_remap.dll release-assets/unioncrax-direct/gcpad_remap.dll
           New-Item -ItemType Directory -Force release-assets/unioncrax-direct/include
           Copy-Item GCPad_Lib/include/*    release-assets/unioncrax-direct/include/
           Copy-Item GCPad_Remap/include/*  release-assets/unioncrax-direct/include/

@@ -11,13 +11,17 @@ endif()
 
 add_executable(GCPad_Frontend_CMD src/main.cpp)
 
+target_include_directories(GCPad_Frontend_CMD PRIVATE
+    ${CMAKE_SOURCE_DIR}/GCPad_Remap/include
+)
+
 target_compile_definitions(GCPad_Frontend_CMD PRIVATE
     WIN32_LEAN_AND_MEAN
     NOMINMAX
 )
 
-# Link against both the core library and the remapper
-target_link_libraries(GCPad_Frontend_CMD PRIVATE gcpad gcpad_remap)
+# Link against the core library (which now includes the remapper)
+target_link_libraries(GCPad_Frontend_CMD PRIVATE gcpad)
 
 target_link_directories(GCPad_Frontend_CMD PRIVATE ${CMAKE_SOURCE_DIR}/GCPad_Lib/libs)
 target_link_libraries(GCPad_Frontend_CMD PRIVATE SDL2)

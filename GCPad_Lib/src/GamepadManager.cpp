@@ -150,10 +150,11 @@ bool GamepadManagerImpl::initialize() {
     check_for_xinput_devices();
 
     // Initialize DirectInput and scan for non-HID, non-XInput controllers
-    dinput_initialized_ = internal::initializeDInput();
-    if (dinput_initialized_) {
-        check_for_dinput_devices();
-    }
+    // DirectInput initialization causes hangs when loaded from DLL - disable for now
+    //dinput_initialized_ = internal::initializeDInput();
+    //if (dinput_initialized_) {
+    //    check_for_dinput_devices();
+    //}
 #endif
 
     // Initialize SDL2 and scan for controllers (primary backend on Linux)
@@ -195,10 +196,11 @@ void GamepadManagerImpl::shutdown() {
         sdl_initialized_ = false;
     }
 #ifdef _WIN32
-    if (dinput_initialized_) {
-        internal::shutdownDInput();
-        dinput_initialized_ = false;
-    }
+    // DirectInput disabled - no need to shutdown
+    //if (dinput_initialized_) {
+    //    internal::shutdownDInput();
+    //    dinput_initialized_ = false;
+    //}
 #endif
 }
 
@@ -255,12 +257,9 @@ void GamepadManagerImpl::setGamepadDisconnectedCallback(GamepadDisconnectedCallb
 }
 
 void GamepadManagerImpl::updateAll() {
-    std::lock_guard<std::mutex> lock(mutex_);
-
     for (auto& gamepad : gamepads_) {
         if (gamepad) {
             if (!gamepad->updateState()) {
-                // fail safe: device disconnected, cleanup handled in hotplug checker
             }
         }
     }
@@ -294,7 +293,8 @@ void GamepadManagerImpl::hotplug_detection_loop() {
 #ifdef _WIN32
         check_for_new_devices();
         check_for_xinput_devices();
-        if (dinput_initialized_) check_for_dinput_devices();
+        // DirectInput disabled - causes hangs when loaded from DLL
+        //if (dinput_initialized_) check_for_dinput_devices();
 #endif
         if (sdl_initialized_) check_for_sdl_devices();
         check_for_disconnected_devices();

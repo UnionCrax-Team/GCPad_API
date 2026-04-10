@@ -18,7 +18,7 @@
 // Requires Windows 10 build 1511+ for ANSI virtual-terminal support.
 
 #include "GamepadManager.h"
-#include "gamepad_input_remapper.h"
+#include "../../gcpad_remap/include/gamepad_input_remapper.h"
 
 #include <iostream>
 #include <iomanip>

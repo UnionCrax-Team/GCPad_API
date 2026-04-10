@@ -3,6 +3,7 @@
 #define DIRECTINPUT_VERSION 0x0800
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <winbase.h>
 #include <dinput.h>
 #include <wbemidl.h>
 #include <oleauto.h>
@@ -328,8 +329,10 @@ bool DInputDevice::setRumble(const Rumble& /*rumble*/) {
 bool initializeDInput() {
     if (g_dinput) return true; // Already initialized
 
+    HINSTANCE exe_instance = nullptr;
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, nullptr, &exe_instance);
     HRESULT hr = DirectInput8Create(
-        GetModuleHandle(nullptr),
+        exe_instance,
         DIRECTINPUT_VERSION,
         IID_IDirectInput8A,
         reinterpret_cast<void**>(&g_dinput),

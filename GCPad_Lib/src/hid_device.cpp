@@ -146,6 +146,12 @@ bool HidDevice::read(std::vector<uint8_t>& buffer) {
             return false;
         }
 
+        DWORD wait_result = WaitForSingleObject(read_overlapped_.hEvent, 100);
+        if (wait_result == WAIT_TIMEOUT) {
+            CancelIo(handle_);
+            return false;
+        }
+        
         if (!GetOverlappedResult(handle_, &read_overlapped_, &bytes_read, TRUE)) {
             return false;
         }

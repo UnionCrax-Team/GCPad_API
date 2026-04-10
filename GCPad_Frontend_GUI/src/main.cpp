@@ -8,7 +8,7 @@
 // Requires: SDL2 (vendored on Windows, system package on Linux)
 
 #include "GamepadManager.h"
-#include "gamepad_input_remapper.h"
+#include "../../gcpad_remap/include/gamepad_input_remapper.h"
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"

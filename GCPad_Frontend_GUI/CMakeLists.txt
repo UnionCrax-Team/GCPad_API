@@ -54,11 +54,15 @@ endif()
 
 add_executable(GCPad_Frontend_GUI src/main.cpp)
 
+target_include_directories(GCPad_Frontend_GUI PRIVATE
+    ${CMAKE_SOURCE_DIR}/GCPad_Remap/include
+)
+
 target_compile_definitions(GCPad_Frontend_GUI PRIVATE
     $<$<PLATFORM_ID:Windows>:WIN32_LEAN_AND_MEAN NOMINMAX>
 )
 
-target_link_libraries(GCPad_Frontend_GUI PRIVATE gcpad gcpad_remap imgui_lib)
+target_link_libraries(GCPad_Frontend_GUI PRIVATE gcpad imgui_lib)
 
 if(WIN32)
     target_link_directories(GCPad_Frontend_GUI PRIVATE ${CMAKE_SOURCE_DIR}/GCPad_Lib/libs)
