@@ -254,6 +254,7 @@ static void log_push(std::string msg) {
 }
 
 // LED colours for cycling
+// Only for Dualshock 4 and Dualsense
 static const gcpad::Color LED_CYCLE[] = {
     { 255,   0,   0 }, { 0, 255,   0 }, { 0,   0, 255 },
     { 255, 128,   0 }, { 128, 0, 255 }, { 0, 255, 255 },
@@ -274,7 +275,7 @@ struct MappingProfile {
 
     std::vector<ButtonMap>       button_keys;
     std::vector<ButtonMouseMap>  button_mice;
-    std::vector<ButtonWheelMap> button_wheels;
+    std::vector<ButtonWheelMap>  button_wheels;
     std::vector<AxisMouseMap>    axis_mice;
     std::vector<AxisKeyMap>      axis_keys;
     std::vector<AxisMouseBtnMap> axis_mouse_btns;
@@ -285,7 +286,6 @@ struct MappingProfile {
         remap.resetState();
         for (auto& bk : button_keys)     remap.mapButtonToKey(bk.button, bk.vk);
         for (auto& bm : button_mice)     remap.mapButtonToMouseButton(bm.button, bm.mouse);
-        for (auto& bw : button_wheels)    remap.mapButtonToWheel(bw.button, bw.delta);
         for (auto& am : axis_mice)       remap.mapAxisToMouse(am.axis, am.sensitivity, am.deadzone, am.invert, am.curve);
         for (auto& ak : axis_keys)       remap.mapAxisToKey(ak.axis, ak.vk, ak.threshold, ak.negative);
         for (auto& ab : axis_mouse_btns) remap.mapAxisToMouseButton(ab.axis, ab.mouse, ab.threshold);
@@ -403,12 +403,12 @@ static MappingProfile makeProfileHalfLife() {
     p.axis_mouse_btns.push_back({ gcpad::Axis::LeftTrigger,  gcpad::MouseButton::Right, 0.3f }); // secondary
     // Face buttons
     p.button_keys.push_back({ gcpad::Button::A, VK_SPACE });    // jump
-    p.button_keys.push_back({ gcpad::Button::B, VK_LCONTROL }); // crouch
-    p.button_keys.push_back({ gcpad::Button::X, 'R' });         // reload
-    p.button_keys.push_back({ gcpad::Button::Y, 'E' });         // use
+    p.button_keys.push_back({ gcpad::Button::B, VK_LCONTROL }); // duck
+    p.button_keys.push_back({ gcpad::Button::X, 'E' });         // use
+    p.button_keys.push_back({ gcpad::Button::Y, 'R' });         // reload
     // Bumpers
-    p.button_wheels.push_back({ gcpad::Button::L1, 120 });   // scroll up
-    p.button_wheels.push_back({ gcpad::Button::R1, -120 });  // scroll down
+    p.button_wheels.push_back({ gcpad::Button::L1, 120 });        // +invprev
+    p.button_wheels.push_back({ gcpad::Button::R1, -120 });       // +invnext
     // Stick clicks
     p.button_keys.push_back({ gcpad::Button::L3, VK_LSHIFT });  // walk
     p.button_keys.push_back({ gcpad::Button::R3, 'G' });        // spray
@@ -419,7 +419,7 @@ static MappingProfile makeProfileHalfLife() {
     p.button_keys.push_back({ gcpad::Button::DPad_Left,  '4' }); // explosives
     // System
     p.button_keys.push_back({ gcpad::Button::Start,  VK_ESCAPE }); // menu
-    p.button_keys.push_back({ gcpad::Button::Select, 'F' });     // scoreboard
+    p.button_keys.push_back({ gcpad::Button::Select, VK_TAB });    // scoreboard
     return p;
 }
 
@@ -439,12 +439,12 @@ static MappingProfile makeProfileHalfLife2() {
     p.axis_mouse_btns.push_back({ gcpad::Axis::LeftTrigger,  gcpad::MouseButton::Right, 0.25f }); // secondary / punt
     // Face buttons
     p.button_keys.push_back({ gcpad::Button::A, VK_SPACE });    // jump
-    p.button_keys.push_back({ gcpad::Button::B, VK_LCONTROL }); // crouch
+    p.button_keys.push_back({ gcpad::Button::B, VK_LCONTROL }); // duck
     p.button_keys.push_back({ gcpad::Button::X, 'R' });         // reload
     p.button_keys.push_back({ gcpad::Button::Y, 'E' });         // use / pick up
     // Bumpers
-    p.button_wheels.push_back({ gcpad::Button::L1, 120 });   // scroll up
-    p.button_wheels.push_back({ gcpad::Button::R1, -120 });  // scroll down
+    p.button_wheels.push_back({ gcpad::Button::L1, 120 });        // +invprev
+    p.button_wheels.push_back({ gcpad::Button::R1, -120 });        // +invnext
     // Stick clicks
     p.button_keys.push_back({ gcpad::Button::L3, VK_LSHIFT });  // sprint
     p.button_keys.push_back({ gcpad::Button::R3, 'Z' });        // suit zoom
@@ -455,7 +455,7 @@ static MappingProfile makeProfileHalfLife2() {
     p.button_keys.push_back({ gcpad::Button::DPad_Left,  '4' }); // shotgun / crossbow
     // System
     p.button_keys.push_back({ gcpad::Button::Start,  VK_ESCAPE }); // menu
-    p.button_keys.push_back({ gcpad::Button::Select, 'F' });     // scoreboard
+    p.button_keys.push_back({ gcpad::Button::Select, 'F' });    // flashlight
     p.button_keys.push_back({ gcpad::Button::Guide,  '5' });       // RPG / grenades
     return p;
 }

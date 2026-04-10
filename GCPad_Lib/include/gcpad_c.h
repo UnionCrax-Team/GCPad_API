@@ -165,7 +165,7 @@ GCPAD_C_API int gcpad_set_trigger_effect(GCPadManagerHandle mgr, int slot,
  */
 GCPAD_C_API int gcpad_set_player_leds(GCPadManagerHandle mgr, int slot, uint8_t led_mask);
 
-/* ── Input Remapping ─────────────────────────────────────────────────────────── */
+/* ── Input Remapping (silly me, how could I forget this?) ───────────────────── */
 
 /** Opaque remapper handle */
 typedef void* GCPadRemapperHandle;
@@ -181,9 +181,6 @@ GCPAD_C_API void gcpad_remapper_map_button_to_key(GCPadRemapperHandle remapper, 
 
 /** Map a button to a mouse button (0=left, 1=right, 2=middle) */
 GCPAD_C_API void gcpad_remapper_map_button_to_mouse(GCPadRemapperHandle remapper, int button, int mouse_button);
-
-/** Map a button to mouse wheel (positive=up, negative=down) */
-GCPAD_C_API void gcpad_remapper_map_button_to_wheel(GCPadRemapperHandle remapper, int button, int delta);
 
 /** Map an axis to mouse motion */
 GCPAD_C_API void gcpad_remapper_map_axis_to_mouse(GCPadRemapperHandle remapper, int axis, float sensitivity, float deadzone, int invert, float curve);
