@@ -9,6 +9,16 @@
 
 #include "gcpad.h"
 
+#ifdef _WIN32
+  #ifdef GCPAD_REMAP_EXPORTS
+    #define GCPAD_REMAP_API __declspec(dllexport)
+  #else
+    #define GCPAD_REMAP_API __declspec(dllimport)
+  #endif
+#else
+  #define GCPAD_REMAP_API
+#endif
+
 namespace gcpad {
 
 // ── Output event types ───────────────────────────────────────────────────────
@@ -106,7 +116,7 @@ struct ButtonWheelMapping {
 
 // ── Main remapper class ──────────────────────────────────────────────────────
 
-struct GamepadInputRemapper : public Remapper {
+struct GCPAD_REMAP_API GamepadInputRemapper : public Remapper {
     // Button -> keyboard key
     std::array<std::optional<uint16_t>, static_cast<size_t>(Button::COUNT)> button_to_key;
     // Button -> mouse button

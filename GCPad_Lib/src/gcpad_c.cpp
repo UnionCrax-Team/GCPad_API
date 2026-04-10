@@ -7,7 +7,6 @@
 
 #include "gcpad_c.h"
 #include "GamepadManager.h"
-#include "gamepad_input_remapper.h"
 
 #include <memory>
 #include <cstring>
@@ -24,17 +23,8 @@ struct GCPadManagerWrapper {
     void*                disconnected_ud = nullptr;
 };
 
-struct GCPadRemapperWrapper {
-    std::shared_ptr<gcpad::GamepadInputRemapper> remapper;
-    gcpad::GamepadState previous_state;
-};
-
 static inline GCPadManagerWrapper* to_wrapper(GCPadManagerHandle h) {
     return static_cast<GCPadManagerWrapper*>(h);
-}
-
-static inline GCPadRemapperWrapper* to_remapper_wrapper(GCPadRemapperHandle h) {
-    return static_cast<GCPadRemapperWrapper*>(h);
 }
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -200,130 +190,6 @@ void gcpad_set_disconnected_callback(GCPadManagerHandle mgr,
     auto* w = to_wrapper(mgr);
     w->disconnected_cb = cb;
     w->disconnected_ud = userdata;
-}
-
-// ── Input Remapping ───────────────────────────────────────────────────────────
-
-GCPadRemapperHandle gcpad_remapper_create() {
-    auto* w = new (std::nothrow) GCPadRemapperWrapper();
-    if (!w) return nullptr;
-    w->remapper = std::make_shared<gcpad::GamepadInputRemapper>();
-    return static_cast<GCPadRemapperHandle>(w);
-}
-
-void gcpad_remapper_destroy(GCPadRemapperHandle remapper) {
-    if (!remapper) return;
-    delete to_remapper_wrapper(remapper);
-}
-
-void gcpad_remapper_map_button_to_key(GCPadRemapperHandle remapper, int button, uint16_t virtual_key) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->mapButtonToKey(static_cast<gcpad::Button>(button), virtual_key);
-}
-
-void gcpad_remapper_map_button_to_mouse(GCPadRemapperHandle remapper, int button, int mouse_button) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->mapButtonToMouseButton(
-        static_cast<gcpad::Button>(button),
-        static_cast<gcpad::MouseButton>(mouse_button)
-    );
-}
-
-void gcpad_remapper_map_button_to_wheel(GCPadRemapperHandle remapper, int button, int delta) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->mapButtonToWheel(
-        static_cast<gcpad::Button>(button),
-        delta
-    );
-}
-
-void gcpad_remapper_map_axis_to_mouse(GCPadRemapperHandle remapper, int axis, float sensitivity, float deadzone, int invert, float curve) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->mapAxisToMouse(
-        static_cast<gcpad::Axis>(axis),
-        sensitivity, deadzone, invert != 0, curve
-    );
-}
-
-void gcpad_remapper_map_axis_to_key(GCPadRemapperHandle remapper, int axis, uint16_t virtual_key, float threshold, int negative_direction) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->mapAxisToKey(
-        static_cast<gcpad::Axis>(axis),
-        virtual_key, threshold, negative_direction != 0
-    );
-}
-
-void gcpad_remapper_map_axis_to_mouse_button(GCPadRemapperHandle remapper, int axis, int mouse_button, float threshold) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->mapAxisToMouseButton(
-        static_cast<gcpad::Axis>(axis),
-        static_cast<gcpad::MouseButton>(mouse_button),
-        threshold
-    );
-}
-
-void gcpad_remapper_map_axis_to_wheel(GCPadRemapperHandle remapper, int axis, int delta, float deadzone, int invert, float tick_rate) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->mapAxisToWheel(
-        static_cast<gcpad::Axis>(axis),
-        delta, deadzone, invert != 0, tick_rate
-    );
-}
-
-void gcpad_remapper_clear_all(GCPadRemapperHandle remapper) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->clearAllButtonMappings();
-    w->remapper->clearAllAxisMappings();
-}
-
-int gcpad_remapper_send_input(GCPadRemapperHandle remapper, GCPadStateC* current_state, GCPadStateC* previous_state) {
-    if (!remapper || !current_state) return 0;
-    auto* w = to_remapper_wrapper(remapper);
-
-    gcpad::GamepadState current;
-    for (int i = 0; i < GCPAD_BUTTON_COUNT; ++i) {
-        current.buttons[i] = current_state->buttons[i] != 0;
-    }
-    for (int i = 0; i < GCPAD_AXIS_COUNT; ++i) {
-        current.axes[i] = current_state->axes[i];
-    }
-
-    gcpad::GamepadState previous;
-    if (previous_state) {
-        for (int i = 0; i < GCPAD_BUTTON_COUNT; ++i) {
-            previous.buttons[i] = previous_state->buttons[i] != 0;
-        }
-        for (int i = 0; i < GCPAD_AXIS_COUNT; ++i) {
-            previous.axes[i] = previous_state->axes[i];
-        }
-    }
-
-    return w->remapper->sendInput(current, previous) ? 1 : 0;
-}
-
-void gcpad_remapper_reset_state(GCPadRemapperHandle remapper) {
-    if (!remapper) return;
-    auto* w = to_remapper_wrapper(remapper);
-    w->remapper->resetState();
-}
-
-void gcpad_set_remapper(GCPadManagerHandle mgr, int slot, GCPadRemapperHandle remapper) {
-    if (!mgr) return;
-    auto* w = to_wrapper(mgr);
-    if (!remapper) {
-        w->mgr->setRemapper(nullptr);
-        return;
-    }
-    auto* rw = to_remapper_wrapper(remapper);
-    w->mgr->setRemapper(rw->remapper);
 }
 
 } // extern "C"

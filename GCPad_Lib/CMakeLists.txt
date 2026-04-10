@@ -70,10 +70,10 @@ target_include_directories(gcpad
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/internal
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor
-        ${CMAKE_CURRENT_SOURCE_DIR}../GCPad_Remap/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../GCPad_Remap/include
 )
 
-target_compile_definitions(gcpad PRIVATE
+target_compile_definitions(gcpad PUBLIC
     GCPAD_API_EXPORTS
     GCPAD_PACKAGE_VERSION="${PROJECT_VERSION}"
     GCPAD_GIT_COMMIT="${GCPAD_GIT_COMMIT}"

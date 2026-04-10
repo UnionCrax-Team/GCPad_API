@@ -7,6 +7,8 @@
 #ifdef _WIN32
   #ifdef GCPAD_API_EXPORTS
     #define GCPAD_API __declspec(dllexport)
+  #elif defined(GCPAD_STATIC)
+    #define GCPAD_API
   #else
     #define GCPAD_API __declspec(dllimport)
   #endif
