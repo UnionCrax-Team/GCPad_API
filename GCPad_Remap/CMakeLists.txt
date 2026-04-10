@@ -13,6 +13,8 @@ target_include_directories(gcpad_remap
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/GCPad_Lib/include
 )
 
 if(WIN32)

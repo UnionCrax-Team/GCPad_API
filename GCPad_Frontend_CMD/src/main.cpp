@@ -267,12 +267,14 @@ struct MappingProfile {
     std::string name;
     struct ButtonMap      { gcpad::Button button; uint16_t vk; };
     struct ButtonMouseMap { gcpad::Button button; gcpad::MouseButton mouse; };
+    struct ButtonWheelMap{ gcpad::Button button; int delta; };
     struct AxisMouseMap   { gcpad::Axis axis; float sensitivity; float deadzone; bool invert; float curve; };
     struct AxisKeyMap     { gcpad::Axis axis; uint16_t vk; float threshold; bool negative; };
     struct AxisMouseBtnMap{ gcpad::Axis axis; gcpad::MouseButton mouse; float threshold; };
 
     std::vector<ButtonMap>       button_keys;
     std::vector<ButtonMouseMap>  button_mice;
+    std::vector<ButtonWheelMap> button_wheels;
     std::vector<AxisMouseMap>    axis_mice;
     std::vector<AxisKeyMap>      axis_keys;
     std::vector<AxisMouseBtnMap> axis_mouse_btns;
@@ -283,6 +285,7 @@ struct MappingProfile {
         remap.resetState();
         for (auto& bk : button_keys)     remap.mapButtonToKey(bk.button, bk.vk);
         for (auto& bm : button_mice)     remap.mapButtonToMouseButton(bm.button, bm.mouse);
+        for (auto& bw : button_wheels)    remap.mapButtonToWheel(bw.button, bw.delta);
         for (auto& am : axis_mice)       remap.mapAxisToMouse(am.axis, am.sensitivity, am.deadzone, am.invert, am.curve);
         for (auto& ak : axis_keys)       remap.mapAxisToKey(ak.axis, ak.vk, ak.threshold, ak.negative);
         for (auto& ab : axis_mouse_btns) remap.mapAxisToMouseButton(ab.axis, ab.mouse, ab.threshold);
@@ -404,8 +407,8 @@ static MappingProfile makeProfileHalfLife() {
     p.button_keys.push_back({ gcpad::Button::X, 'R' });         // reload
     p.button_keys.push_back({ gcpad::Button::Y, 'E' });         // use
     // Bumpers
-    p.button_keys.push_back({ gcpad::Button::L1, 'Q' });        // last weapon
-    p.button_keys.push_back({ gcpad::Button::R1, 'F' });        // flashlight
+    p.button_wheels.push_back({ gcpad::Button::L1, 120 });   // scroll up
+    p.button_wheels.push_back({ gcpad::Button::R1, -120 });  // scroll down
     // Stick clicks
     p.button_keys.push_back({ gcpad::Button::L3, VK_LSHIFT });  // walk
     p.button_keys.push_back({ gcpad::Button::R3, 'G' });        // spray
@@ -416,7 +419,7 @@ static MappingProfile makeProfileHalfLife() {
     p.button_keys.push_back({ gcpad::Button::DPad_Left,  '4' }); // explosives
     // System
     p.button_keys.push_back({ gcpad::Button::Start,  VK_ESCAPE }); // menu
-    p.button_keys.push_back({ gcpad::Button::Select, VK_TAB });    // scoreboard
+    p.button_keys.push_back({ gcpad::Button::Select, 'F' });     // scoreboard
     return p;
 }
 
@@ -440,8 +443,8 @@ static MappingProfile makeProfileHalfLife2() {
     p.button_keys.push_back({ gcpad::Button::X, 'R' });         // reload
     p.button_keys.push_back({ gcpad::Button::Y, 'E' });         // use / pick up
     // Bumpers
-    p.button_keys.push_back({ gcpad::Button::L1, 'F' });        // flashlight
-    p.button_keys.push_back({ gcpad::Button::R1, 'Q' });        // last weapon / quick-switch
+    p.button_wheels.push_back({ gcpad::Button::L1, 120 });   // scroll up
+    p.button_wheels.push_back({ gcpad::Button::R1, -120 });  // scroll down
     // Stick clicks
     p.button_keys.push_back({ gcpad::Button::L3, VK_LSHIFT });  // sprint
     p.button_keys.push_back({ gcpad::Button::R3, 'Z' });        // suit zoom
@@ -452,7 +455,7 @@ static MappingProfile makeProfileHalfLife2() {
     p.button_keys.push_back({ gcpad::Button::DPad_Left,  '4' }); // shotgun / crossbow
     // System
     p.button_keys.push_back({ gcpad::Button::Start,  VK_ESCAPE }); // menu
-    p.button_keys.push_back({ gcpad::Button::Select, VK_TAB });    // scoreboard
+    p.button_keys.push_back({ gcpad::Button::Select, 'F' });     // scoreboard
     p.button_keys.push_back({ gcpad::Button::Guide,  '5' });       // RPG / grenades
     return p;
 }
@@ -549,7 +552,7 @@ static std::vector<std::string> stickViz(const char* label, float x, float y) {
 
     // Calculate distance from center for color
     float dist = std::sqrt(x * x + y * y);
-    dist = std::min(dist, 1.0f);
+    dist = std::fmin(dist, 1.0f);
     std::string dotColor = tc(
         static_cast<int>(80 + dist * 175),
         static_cast<int>(220 - dist * 100),

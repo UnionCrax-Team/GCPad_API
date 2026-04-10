@@ -184,23 +184,34 @@ bool XboxDevice::setRumble(const Rumble& rumble) {
 std::vector<XboxDeviceInfo> getXboxDeviceInfos() {
     return {
         // Xbox One controllers
-        {0x045E, 0x02D1, "Xbox One Controller"},
-        {0x045E, 0x02DD, "Xbox One Controller (FW 2015)"},
-        {0x045E, 0x02E3, "Xbox One Elite Controller"},
-        {0x045E, 0x02EA, "Xbox One S Controller"},
-        {0x045E, 0x028E, "Xbox 360 Controller"},
+        {0x045E, 0x02D1, "Xbox One Controller", -1},
+        {0x045E, 0x02DD, "Xbox One Controller (FW 2015)", -1},
+        {0x045E, 0x02E3, "Xbox One Elite Controller", -1},
+        {0x045E, 0x02EA, "Xbox One S Controller", -1},
+        {0x045E, 0x028E, "Xbox 360 Controller", -1},
         // Xbox Series X|S controllers
-        {0x045E, 0x0B12, "Xbox Series X|S Controller"},
-        {0x045E, 0x0B13, "Xbox Series X|S Controller (BT)"},
-        {0x045E, 0x0B05, "Xbox One Controller (GIP)"},
+        {0x045E, 0x0B12, "Xbox Series X|S Controller", -1},
+        {0x045E, 0x0B13, "Xbox Series X|S Controller (BT)", -1},
+        {0x045E, 0x0B05, "Xbox One Controller (GIP)", -1},
         // Xbox Elite Series 2
-        {0x045E, 0x0B00, "Xbox Elite Series 2"},
-        {0x045E, 0x0B22, "Xbox Adaptive Controller"},
+        {0x045E, 0x0B00, "Xbox Elite Series 2", -1},
+        {0x045E, 0x0B22, "Xbox Adaptive Controller", -1},
     };
 }
 
 std::unique_ptr<GamepadDevice> createXboxDevice(std::unique_ptr<HidDevice> hid_device, int index) {
     return std::make_unique<XboxDevice>(std::move(hid_device), index);
+}
+
+std::pair<uint16_t, uint16_t> getXInputDeviceVidPid(int xinput_index) {
+    // Xbox controllers that work with XInput
+    switch (xinput_index) {
+        case 0: return {0x045E, 0x028E}; // Xbox 360 Controller
+        case 1: return {0x045E, 0x0B12}; // Xbox Series X|S Controller
+        case 2: return {0x045E, 0x0B05}; // Xbox One Controller (GIP)
+        case 3: return {0x045E, 0x0B22}; // Xbox Adaptive Controller
+        default: return {0, 0};
+    }
 }
 
 } // namespace internal

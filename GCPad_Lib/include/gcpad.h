@@ -37,7 +37,7 @@ enum class Axis {
     COUNT
 };
 
-// Single touchpad finger contact
+// Single touchpad finger contact, treat as a trackpad (that's what it technically is, right?)
 struct TouchPoint {
     bool     active = false;
     uint16_t x      = 0;    // 0..1919 (DS4/DualSense touchpad width)

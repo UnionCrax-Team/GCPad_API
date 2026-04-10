@@ -165,6 +165,50 @@ GCPAD_C_API int gcpad_set_trigger_effect(GCPadManagerHandle mgr, int slot,
  */
 GCPAD_C_API int gcpad_set_player_leds(GCPadManagerHandle mgr, int slot, uint8_t led_mask);
 
+/* ── Input Remapping ─────────────────────────────────────────────────────────── */
+
+/** Opaque remapper handle */
+typedef void* GCPadRemapperHandle;
+
+/** Create a new input remapper */
+GCPAD_C_API GCPadRemapperHandle gcpad_remapper_create(void);
+
+/** Destroy a remapper */
+GCPAD_C_API void gcpad_remapper_destroy(GCPadRemapperHandle remapper);
+
+/** Map a button to a keyboard key (virtual key code) */
+GCPAD_C_API void gcpad_remapper_map_button_to_key(GCPadRemapperHandle remapper, int button, uint16_t virtual_key);
+
+/** Map a button to a mouse button (0=left, 1=right, 2=middle) */
+GCPAD_C_API void gcpad_remapper_map_button_to_mouse(GCPadRemapperHandle remapper, int button, int mouse_button);
+
+/** Map a button to mouse wheel (positive=up, negative=down) */
+GCPAD_C_API void gcpad_remapper_map_button_to_wheel(GCPadRemapperHandle remapper, int button, int delta);
+
+/** Map an axis to mouse motion */
+GCPAD_C_API void gcpad_remapper_map_axis_to_mouse(GCPadRemapperHandle remapper, int axis, float sensitivity, float deadzone, int invert, float curve);
+
+/** Map an axis to a keyboard key (threshold-based) */
+GCPAD_C_API void gcpad_remapper_map_axis_to_key(GCPadRemapperHandle remapper, int axis, uint16_t virtual_key, float threshold, int negative_direction);
+
+/** Map an axis to a mouse button */
+GCPAD_C_API void gcpad_remapper_map_axis_to_mouse_button(GCPadRemapperHandle remapper, int axis, int mouse_button, float threshold);
+
+/** Map an axis to mouse wheel */
+GCPAD_C_API void gcpad_remapper_map_axis_to_wheel(GCPadRemapperHandle remapper, int axis, int delta, float deadzone, int invert, float tick_rate);
+
+/** Clear all mappings */
+GCPAD_C_API void gcpad_remapper_clear_all(GCPadRemapperHandle remapper);
+
+/** Apply remapping and send input (returns 1 on success) */
+GCPAD_C_API int gcpad_remapper_send_input(GCPadRemapperHandle remapper, GCPadStateC* current_state, GCPadStateC* previous_state);
+
+/** Reset accumulated state (call when switching profiles) */
+GCPAD_C_API void gcpad_remapper_reset_state(GCPadRemapperHandle remapper);
+
+/** Set the remapper on a gamepad slot */
+GCPAD_C_API void gcpad_set_remapper(GCPadManagerHandle mgr, int slot, GCPadRemapperHandle remapper);
+
 /* ── Hotplug callbacks ──────────────────────────────────────────────────────── */
 
 /**

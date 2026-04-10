@@ -98,13 +98,21 @@ struct AxisWheelMapping {
     float tick_rate = 0.15f;
 };
 
+// Button-to-scroll-wheel mapping (e.g. L1 -> wheel up, R1 -> wheel down)
+struct ButtonWheelMapping {
+    bool enabled = false;
+    int delta = 120;  // positive = up, negative = down
+};
+
 // ── Main remapper class ──────────────────────────────────────────────────────
 
-struct GamepadInputRemapper {
+struct GamepadInputRemapper : public Remapper {
     // Button -> keyboard key
     std::array<std::optional<uint16_t>, static_cast<size_t>(Button::COUNT)> button_to_key;
     // Button -> mouse button
     std::array<std::optional<MouseButton>, static_cast<size_t>(Button::COUNT)> button_to_mouse;
+    // Button -> scroll wheel
+    std::array<ButtonWheelMapping, static_cast<size_t>(Button::COUNT)> button_to_wheel;
 
     // Axis -> mouse motion (typically left/right stick)
     std::array<AxisMouseMapping, static_cast<size_t>(Axis::COUNT)> axis_to_mouse;
@@ -121,6 +129,7 @@ struct GamepadInputRemapper {
     // ── Button mapping ───────────────────────────────────────────────────────
     void mapButtonToKey(Button button, uint16_t virtual_key);
     void mapButtonToMouseButton(Button button, MouseButton mouse_button);
+    void mapButtonToWheel(Button button, int delta = 120);
     void clearButtonMapping(Button button);
     void clearAllButtonMappings();
 

@@ -328,17 +328,18 @@ std::vector<SDLDeviceInfo> enumerateSDLDevices() {
 
     int numJoysticks = SDL_NumJoysticks();
     for (int i = 0; i < numJoysticks; ++i) {
+        // Skip raw joysticks - only use game controller interface
+        // This prevents DualShock 4 and similar controllers from appearing as multiple devices
+        if (!SDL_IsGameController(i)) {
+            continue;
+        }
+
         SDLDeviceInfo info;
         info.sdl_joystick_index = i;
-        info.is_game_controller = SDL_IsGameController(i) == SDL_TRUE;
+        info.is_game_controller = true;
 
-        if (info.is_game_controller) {
-            const char* n = SDL_GameControllerNameForIndex(i);
-            info.name = n ? n : "Unknown GameController";
-        } else {
-            const char* n = SDL_JoystickNameForIndex(i);
-            info.name = n ? n : "Unknown Joystick";
-        }
+        const char* n = SDL_GameControllerNameForIndex(i);
+        info.name = n ? n : "Unknown GameController";
 
         // VID/PID (SDL 2.0.6+)
 #if SDL_VERSION_ATLEAST(2, 0, 6)

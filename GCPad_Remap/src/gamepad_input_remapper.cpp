@@ -40,7 +40,7 @@ static float applyDeadzoneAndCurve(float value, float deadzone, float curve) {
     }
     // Normalize from [deadzone, 1] to [0, 1]
     float normalized = (absVal - deadzone) / (1.0f - deadzone);
-    normalized = std::min(normalized, 1.0f);
+    normalized = std::fmin(normalized, 1.0f);
     // Apply power curve for acceleration
     float curved = std::pow(normalized, curve);
     // Restore original sign
@@ -84,15 +84,23 @@ void GamepadInputRemapper::mapButtonToMouseButton(Button button, MouseButton mou
     button_to_mouse[static_cast<size_t>(button)] = mouse_button;
 }
 
+void GamepadInputRemapper::mapButtonToWheel(Button button, int delta) {
+    auto& m = button_to_wheel[static_cast<size_t>(button)];
+    m.enabled = true;
+    m.delta = delta;
+}
+
 void GamepadInputRemapper::clearButtonMapping(Button button) {
     size_t idx = static_cast<size_t>(button);
     button_to_key[idx].reset();
     button_to_mouse[idx].reset();
+    button_to_wheel[idx].enabled = false;
 }
 
 void GamepadInputRemapper::clearAllButtonMappings() {
     for (auto& b : button_to_key)  b.reset();
     for (auto& b : button_to_mouse) b.reset();
+    for (auto& b : button_to_wheel) b.enabled = false;
 }
 
 // ── Axis mapping ─────────────────────────────────────────────────────────────
@@ -168,7 +176,7 @@ std::vector<GamepadInputEvent> GamepadInputRemapper::remap(
         const GamepadState& current, const GamepadState& previous) const {
     std::vector<GamepadInputEvent> events;
 
-    // ── Button -> keyboard / mouse button events ─────────────────────────────
+    // ── Button -> keyboard / mouse button / mouse wheel events ───────────────
     for (size_t i = 0; i < static_cast<size_t>(Button::COUNT); ++i) {
         bool curPressed  = current.buttons[i];
         bool prevPressed = previous.buttons[i];
@@ -189,6 +197,13 @@ std::vector<GamepadInputEvent> GamepadInputRemapper::remap(
                 ev.type = GamepadInputEvent::Type::MouseButton;
                 ev.mouse_button.button  = *button_to_mouse[i];
                 ev.mouse_button.pressed = curPressed;
+                events.push_back(ev);
+            }
+            // Button -> mouse wheel (only on press, not release)
+            if (button_to_wheel[i].enabled && curPressed) {
+                GamepadInputEvent ev{};
+                ev.type = GamepadInputEvent::Type::MouseWheel;
+                ev.mouse_wheel.delta = button_to_wheel[i].delta;
                 events.push_back(ev);
             }
         }

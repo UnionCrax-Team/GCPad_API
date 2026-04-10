@@ -70,6 +70,7 @@ target_include_directories(gcpad
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/internal
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor
+        ${CMAKE_CURRENT_SOURCE_DIR}../GCPad_Remap/include
 )
 
 target_compile_definitions(gcpad PRIVATE
@@ -85,7 +86,7 @@ target_compile_definitions(gcpad PRIVATE
 if(WIN32)
     target_compile_definitions(gcpad PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
     target_link_directories(gcpad PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/libs)
-    target_link_libraries(gcpad PRIVATE Xinput9_1_0 dinput8 dxguid SDL2)
+    target_link_libraries(gcpad PRIVATE Xinput9_1_0 dinput8 dxguid SDL2 gcpad_remap)
 else()
     # Linux: use system SDL2, set visibility for shared lib exports
     find_package(PkgConfig REQUIRED)

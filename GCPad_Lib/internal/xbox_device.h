@@ -13,10 +13,12 @@ struct XboxDeviceInfo {
     uint16_t vendor_id;
     uint16_t product_id;
     std::string name;
+    int xinput_index;  // -1 means HID-based, not XInput
 };
 
 GCPAD_API std::vector<XboxDeviceInfo> getXboxDeviceInfos();
 GCPAD_API std::unique_ptr<GamepadDevice> createXboxDevice(std::unique_ptr<HidDevice> hid_device, int index);
+GCPAD_API std::pair<uint16_t, uint16_t> getXInputDeviceVidPid(int xinput_index);
 
 } // namespace internal
 } // namespace gcpad
