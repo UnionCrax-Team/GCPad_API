@@ -61,6 +61,10 @@ endif()
 
 # ── Shared library ────────────────────────────────────────────────────────────
 
+list(APPEND GCPAD_SOURCES
+    ${CMAKE_SOURCE_DIR}/GCPad_Remap/src/gamepad_input_remapper.cpp
+)
+
 add_library(gcpad SHARED ${GCPAD_SOURCES})
 
 target_include_directories(gcpad
@@ -112,17 +116,14 @@ install(TARGETS gcpad
     EXPORT      GCPadTargets
     LIBRARY     DESTINATION lib
     ARCHIVE     DESTINATION lib
-    RUNTIME     DESTINATION bin
-    INCLUDES    DESTINATION include
+    RUNTIME    DESTINATION bin
+    INCLUDES   DESTINATION include
 )
 
 install(DIRECTORY include/ DESTINATION include)
 
-install(EXPORT GCPadTargets
-    FILE        GCPadTargets.cmake
-    NAMESPACE   GCPad::
-    DESTINATION lib/cmake/GCPad
-)
+# Don't export gcpad_remap to the CMake export set (it links statically into gcpad)
+# Users who use gcpad will get gcpad_remap implicitly through the static lib
 
 include(CMakePackageConfigHelpers)
 
