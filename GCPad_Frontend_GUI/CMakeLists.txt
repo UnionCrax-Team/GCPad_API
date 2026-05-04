@@ -66,7 +66,15 @@ target_link_libraries(GCPad_Frontend_GUI PRIVATE gcpad imgui_lib)
 
 if(WIN32)
     target_link_directories(GCPad_Frontend_GUI PRIVATE ${CMAKE_SOURCE_DIR}/GCPad_Lib/libs)
-    target_link_libraries(GCPad_Frontend_GUI PRIVATE SDL2)
+    target_link_libraries(GCPad_Frontend_GUI PRIVATE
+        SDL2
+        shell32      # Shell_NotifyIcon (system tray)
+        user32       # CreatePopupMenu, TrackPopupMenu, SetWindowLongPtr
+    )
+    # Include SDL2 syswm header (needed to extract HWND from SDL_Window)
+    target_compile_definitions(GCPad_Frontend_GUI PRIVATE
+        SDL_ENABLE_SYSWM_WINDOWS
+    )
 else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)

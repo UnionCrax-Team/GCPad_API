@@ -47,16 +47,14 @@ static float applyDeadzoneAndCurve(float value, float deadzone, float curve) {
     return (value < 0.0f) ? -curved : curved;
 }
 
-// Convert a processed axis value to pixel motion for mouse movement.
-static int axisToMouseMotion(float value, const AxisMouseMapping& mapping) {
+// Returns the floating-point pixel contribution for this frame.
+// The caller accumulates the fractional remainder so that gentle deflections
+// don't vanish on truncation — that was the root cause of the "stiff" feel.
+static float axisToMouseMotionF(float value, const AxisMouseMapping& mapping) {
     float processed = applyDeadzoneAndCurve(value, mapping.deadzone, mapping.curve);
-    if (processed == 0.0f) {
-        return 0;
-    }
-    if (mapping.invert) {
-        processed = -processed;
-    }
-    return static_cast<int>(processed * mapping.sensitivity);
+    if (processed == 0.0f) return 0.0f;
+    if (mapping.invert) processed = -processed;
+    return processed * mapping.sensitivity;
 }
 
 // ── Construction / reset ─────────────────────────────────────────────────────
@@ -68,6 +66,8 @@ GamepadInputRemapper::GamepadInputRemapper() {
 }
 
 void GamepadInputRemapper::resetState() {
+    mouse_accum_x_ = 0.0f;
+    mouse_accum_y_ = 0.0f;
     wheel_accum_.fill(0.0f);
     axis_key_pos_active_.fill(false);
     axis_key_neg_active_.fill(false);
@@ -210,24 +210,30 @@ std::vector<GamepadInputEvent> GamepadInputRemapper::remap(
     }
 
     // ── Axis -> mouse motion ─────────────────────────────────────────────────
-    int dx = 0, dy = 0;
+    // Accumulate fractional pixels across frames so gentle deflections are
+    // never silently discarded by integer truncation (the "stiff stick" fix).
+    float fdx = 0.0f, fdy = 0.0f;
 
-    auto accumulateAxis = [&](Axis axis, int& target_x, int& target_y, bool isX) {
+    auto accumulateAxisF = [&](Axis axis, float& tx, float& ty, bool isX) {
         size_t idx = static_cast<size_t>(axis);
         if (!axis_to_mouse[idx].enabled) return;
-        int motion = axisToMouseMotion(current.axes[idx], axis_to_mouse[idx]);
-        if (isX) target_x += motion;
-        else     target_y += motion;
+        float motion = axisToMouseMotionF(current.axes[idx], axis_to_mouse[idx]);
+        if (isX) tx += motion; else ty += motion;
     };
 
-    accumulateAxis(Axis::LeftX,  dx, dy, true);
-    accumulateAxis(Axis::LeftY,  dx, dy, false);
-    accumulateAxis(Axis::RightX, dx, dy, true);
-    accumulateAxis(Axis::RightY, dx, dy, false);
+    accumulateAxisF(Axis::LeftX,  fdx, fdy, true);
+    accumulateAxisF(Axis::LeftY,  fdx, fdy, false);
+    accumulateAxisF(Axis::RightX, fdx, fdy, true);
+    accumulateAxisF(Axis::RightY, fdx, fdy, false);
+    accumulateAxisF(Axis::LeftTrigger,  fdx, fdy, true);
+    accumulateAxisF(Axis::RightTrigger, fdx, fdy, true);
 
-    // Triggers can also map to mouse motion (unusual but supported)
-    accumulateAxis(Axis::LeftTrigger,  dx, dy, true);
-    accumulateAxis(Axis::RightTrigger, dx, dy, true);
+    mouse_accum_x_ += fdx;
+    mouse_accum_y_ += fdy;
+    int dx = static_cast<int>(mouse_accum_x_);
+    int dy = static_cast<int>(mouse_accum_y_);
+    mouse_accum_x_ -= static_cast<float>(dx);
+    mouse_accum_y_ -= static_cast<float>(dy);
 
     if (dx != 0 || dy != 0) {
         GamepadInputEvent ev{};

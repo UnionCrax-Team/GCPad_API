@@ -68,13 +68,15 @@ struct GamepadInputEvent {
 // Axis-to-mouse motion mapping (for analog sticks controlling cursor)
 struct AxisMouseMapping {
     bool enabled = false;
-    float sensitivity = 15.0f;
-    float deadzone = 0.15f;
+    // Pixels per frame at full deflection (before sub-pixel accumulation).
+    // ~25 at 60 fps ≈ 1500 px/s feels natural for desktop/game cursor work.
+    float sensitivity = 25.0f;
+    float deadzone = 0.12f;
     bool invert = false;
-    // Acceleration curve exponent: 1.0 = linear, 2.0 = quadratic, etc.
-    // Higher values give more precision at low deflection and faster motion
-    // at full deflection.
-    float curve = 2.0f;
+    // Response curve exponent applied after deadzone removal.
+    // 1.0 = linear (twitchy), 1.5 = slightly curved (recommended),
+    // 2.0+ = strong curve (precise but sluggish at low deflection).
+    float curve = 1.5f;
 };
 
 // Axis-to-key mapping (e.g. trigger past threshold -> key press,
@@ -173,6 +175,10 @@ struct GCPAD_REMAP_API GamepadInputRemapper : public Remapper {
     static std::string virtualKeyName(uint16_t vk);
 
 private:
+    // Sub-pixel mouse motion accumulators: fractional pixel remainder kept
+    // across frames so gentle stick deflections don't vanish on truncation.
+    mutable float mouse_accum_x_ = 0.0f;
+    mutable float mouse_accum_y_ = 0.0f;
     // Scroll wheel accumulators (mutable because remap() needs to update them
     // even in a const-like usage pattern; sendInput is non-const anyway)
     mutable std::array<float, static_cast<size_t>(Axis::COUNT)> wheel_accum_;
