@@ -1018,8 +1018,8 @@ static void tabSettings(GCPadProfile& p, gcpad::GamepadDevice* pad,
             if (ImGui::SliderInt((std::string("Param1##")+label).c_str(),&p1,0,255)) t.param1=(uint8_t)p1;
             if (ImGui::SliderInt((std::string("Param2##")+label).c_str(),&p2,0,255)) t.param2=(uint8_t)p2;
             if (ImGui::Button((std::string("Apply##")+label).c_str())) {
-                if (label[0]=='L') pad->setTriggerEffect(gcpad::Button::L2, buildTriggerEffect(t));
-                else               pad->setTriggerEffect(gcpad::Button::R2, buildTriggerEffect(t));
+                 if (label[0]=='L') pad->setTriggerEffect(false, buildTriggerEffect(t));
+                 else               pad->setTriggerEffect(true,  buildTriggerEffect(t));
             }
         };
         editTrig("Left Trigger",  p.triggerL);
