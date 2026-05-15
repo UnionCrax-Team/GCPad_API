@@ -11,125 +11,199 @@ on:
 jobs:
   # ── CI build (every push / PR) ─────────────────────────────────────────────
   build:
-    runs-on: windows-latest
+    name: ${{ matrix.os }} / ${{ matrix.config }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [windows-2022, ubuntu-22.04]
         config: [Debug, Release]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure
+      # ── Linux deps ───────────────────────────────────────────────────────
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config \
+            libsdl2-dev libx11-dev libxext-dev libxtst-dev
+
+      # ── Windows configure (multi-config VS generator) ────────────────────
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
         shell: cmd
         run: >
           cmake -B build
           -G "Visual Studio 17 2022"
           -A x64
-          -DGCPAD_BUILD_FRONTEND=ON
+          -DGCPAD_BUILD_FRONTEND_CMD=ON
           -DGCPAD_BUILD_FRONTEND_GUI=ON
           -DGCPAD_BUILD_REMAP=ON
 
-      - name: Build
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
         shell: cmd
         run: cmake --build build --config ${{ matrix.config }}
 
-      - name: Upload GCPad_Lib artifacts
+      # ── Linux configure (single-config Ninja/Make) ───────────────────────
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        run: >
+          cmake -B build
+          -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+          -DGCPAD_BUILD_FRONTEND_GUI=ON
+          -DGCPAD_BUILD_REMAP=ON
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        run: cmake --build build --parallel
+
+      # ── Windows artifacts ────────────────────────────────────────────────
+      - name: Upload GCPad_Lib (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: gcpad-lib-${{ matrix.config }}
+          name: gcpad-lib-windows-${{ matrix.config }}
           path: |
             build/GCPad_Lib/${{ matrix.config }}/gcpad.dll
             build/GCPad_Lib/${{ matrix.config }}/gcpad.lib
           if-no-files-found: warn
 
-      - name: Upload GCPad_Remap artifacts
+      - name: Upload GCPad_Frontend_CMD (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: gcpad-remap-${{ matrix.config }}
-          path: |
-            build/GCPad_Remap/${{ matrix.config }}/gcpad_remap.lib
-          if-no-files-found: warn
-
-      - name: Upload GCPad_Frontend artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: gcpad-frontend-${{ matrix.config }}
+          name: gcpad-frontend-cmd-windows-${{ matrix.config }}
           path: |
             build/GCPad_Frontend_CMD/${{ matrix.config }}/GCPad_Frontend_CMD.exe
             build/GCPad_Frontend_CMD/${{ matrix.config }}/gcpad.dll
             build/GCPad_Frontend_CMD/${{ matrix.config }}/SDL2.dll
           if-no-files-found: warn
 
-      - name: Upload GCPad_Frontend_GUI artifacts
+      - name: Upload GCPad_Frontend_GUI (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: gcpad-frontend-gui-${{ matrix.config }}
+          name: gcpad-frontend-gui-windows-${{ matrix.config }}
           path: |
             build/GCPad_Frontend_GUI/${{ matrix.config }}/GCPad_Frontend_GUI.exe
             build/GCPad_Frontend_GUI/${{ matrix.config }}/gcpad.dll
             build/GCPad_Frontend_GUI/${{ matrix.config }}/SDL2.dll
           if-no-files-found: warn
 
+      # ── Linux artifacts ──────────────────────────────────────────────────
+      - name: Upload GCPad_Lib (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcpad-lib-linux-${{ matrix.config }}
+          path: |
+            build/GCPad_Lib/libgcpad.so
+            build/GCPad_Lib/libgcpad.so.*
+          if-no-files-found: warn
+
+      - name: Upload GCPad_Frontend_GUI (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcpad-frontend-gui-linux-${{ matrix.config }}
+          path: |
+            build/GCPad_Frontend_GUI/GCPad_Frontend_GUI
+            build/GCPad_Lib/libgcpad.so*
+          if-no-files-found: warn
+
   # ── GitHub Release (version tags only) ────────────────────────────────────
   release:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: windows-latest
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure
-        shell: cmd
-        run: >
-          cmake -B build
-          -G "Visual Studio 17 2022"
-          -A x64
-          -DGCPAD_BUILD_FRONTEND=ON
-          -DGCPAD_BUILD_FRONTEND_GUI=ON
-          -DGCPAD_BUILD_REMAP=ON
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config \
+            libsdl2-dev libx11-dev libxext-dev libxtst-dev
 
-      - name: Build Release
+      - name: Configure & build (Windows)
+        if: runner.os == 'Windows'
         shell: cmd
-        run: cmake --build build --config Release
+        run: |
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DGCPAD_BUILD_FRONTEND_CMD=ON -DGCPAD_BUILD_FRONTEND_GUI=ON -DGCPAD_BUILD_REMAP=ON
+          cmake --build build --config Release
 
-      - name: Collect release assets
+      - name: Configure & build (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DGCPAD_BUILD_FRONTEND_GUI=ON -DGCPAD_BUILD_REMAP=ON
+          cmake --build build --parallel
+
+      # ── Windows release packaging ────────────────────────────────────────
+      - name: Collect Windows release assets
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release-assets
 
-          # Core library
-          Copy-Item build/GCPad_Lib/Release/gcpad.dll       release-assets/gcpad.dll
-          Copy-Item build/GCPad_Lib/Release/gcpad.lib       release-assets/gcpad.lib
+          Copy-Item build/GCPad_Lib/Release/gcpad.dll release-assets/gcpad.dll
+          Copy-Item build/GCPad_Lib/Release/gcpad.lib release-assets/gcpad.lib
 
-          # Frontend (with DLLs copied by POST_BUILD)
           Copy-Item build/GCPad_Frontend_CMD/Release/GCPad_Frontend_CMD.exe release-assets/GCPad_Frontend_CMD.exe
-          Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll           release-assets/SDL2.dll
+          Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll release-assets/SDL2.dll
 
-          # GUI Frontend
           Copy-Item build/GCPad_Frontend_GUI/Release/GCPad_Frontend_GUI.exe release-assets/GCPad_Frontend_GUI.exe
-          # Bundle public headers for library consumers
+
           New-Item -ItemType Directory -Force release-assets/include
-          Copy-Item GCPad_Lib/include/*    release-assets/include/
-          Copy-Item GCPad_Remap/include/*  release-assets/include/
+          Copy-Item GCPad_Lib/include/*   release-assets/include/
+          Copy-Item GCPad_Remap/include/* release-assets/include/
           Compress-Archive -Path release-assets/include/* -DestinationPath release-assets/gcpad-headers.zip
           Remove-Item -Recurse release-assets/include
 
-          # unioncrax.direct package — DLLs only, no frontend
-          New-Item -ItemType Directory -Force release-assets/unioncrax-direct
-          Copy-Item build/GCPad_Lib/Release/gcpad.dll               release-assets/unioncrax-direct/gcpad.dll
-          Copy-Item build/GCPad_Lib/Release/gcpad.lib               release-assets/unioncrax-direct/gcpad.lib
-          Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll            release-assets/unioncrax-direct/SDL2.dll
+          # unioncrax.direct package — DLLs + headers, no frontend
           New-Item -ItemType Directory -Force release-assets/unioncrax-direct/include
-          Copy-Item GCPad_Lib/include/*    release-assets/unioncrax-direct/include/
-          Copy-Item GCPad_Remap/include/*  release-assets/unioncrax-direct/include/
+          Copy-Item build/GCPad_Lib/Release/gcpad.dll  release-assets/unioncrax-direct/gcpad.dll
+          Copy-Item build/GCPad_Lib/Release/gcpad.lib  release-assets/unioncrax-direct/gcpad.lib
+          Copy-Item build/GCPad_Frontend_CMD/Release/SDL2.dll release-assets/unioncrax-direct/SDL2.dll
+          Copy-Item GCPad_Lib/include/*   release-assets/unioncrax-direct/include/
+          Copy-Item GCPad_Remap/include/* release-assets/unioncrax-direct/include/
           Compress-Archive -Path release-assets/unioncrax-direct/* -DestinationPath release-assets/gcpad-unioncrax-direct.zip
           Remove-Item -Recurse release-assets/unioncrax-direct
 
-      - name: Create GitHub Release
+          # Rename top-level binaries with -windows suffix to avoid clashing with the linux job
+          Rename-Item release-assets/GCPad_Frontend_CMD.exe GCPad_Frontend_CMD-windows.exe
+          Rename-Item release-assets/GCPad_Frontend_GUI.exe GCPad_Frontend_GUI-windows.exe
+          Rename-Item release-assets/gcpad.dll              gcpad-windows.dll
+          Rename-Item release-assets/gcpad.lib              gcpad-windows.lib
+
+      # ── Linux release packaging ──────────────────────────────────────────
+      - name: Collect Linux release assets
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p release-assets
+          cp build/GCPad_Lib/libgcpad.so* release-assets/
+          cp build/GCPad_Frontend_GUI/GCPad_Frontend_GUI release-assets/GCPad_Frontend_GUI-linux
+
+          mkdir -p staging/include staging/lib
+          cp build/GCPad_Lib/libgcpad.so* staging/lib/
+          cp GCPad_Lib/include/*   staging/include/
+          cp GCPad_Remap/include/* staging/include/
+          (cd staging && tar czf ../release-assets/gcpad-linux-x86_64.tar.gz .)
+          rm -rf staging
+
+      - name: Create / update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: release-assets/*
