@@ -35,12 +35,13 @@ set(GCPAD_SOURCES
     src/GamepadManager.cpp
     src/build_metadata.cpp
     src/gcpad_c.cpp
-    src/controller_library.cpp
-    src/usb_interface_parser.cpp
 )
 
 if(WIN32)
-    # Windows-only backends
+    # Windows-only backends. controller_library.cpp / usb_interface_parser.cpp
+    # both depend on the raw-HID PS/Xbox/Nintendo enumerators, which are Win32
+    # only. On Linux SDL2 is the only backend we ship, so those modules are
+    # Windows-only too.
     list(APPEND GCPAD_SOURCES
         src/hid_device.cpp
         src/ps_device.cpp
@@ -48,6 +49,8 @@ if(WIN32)
         src/nintendo_device.cpp
         src/xinput_device.cpp
         src/dinput_device.cpp
+        src/controller_library.cpp
+        src/usb_interface_parser.cpp
     )
 
     # Version resource
@@ -96,6 +99,10 @@ else()
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
     target_link_libraries(gcpad PRIVATE PkgConfig::SDL2)
+    # X11 + XTest for synthetic input on Linux (used by GCPad_Remap, which is
+    # compiled into libgcpad on this platform).
+    pkg_check_modules(X11 REQUIRED IMPORTED_TARGET x11 xtst)
+    target_link_libraries(gcpad PRIVATE PkgConfig::X11)
     target_compile_definitions(gcpad PRIVATE
         GCPAD_LINUX
     )

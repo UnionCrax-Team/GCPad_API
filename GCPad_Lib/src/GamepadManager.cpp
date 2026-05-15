@@ -105,6 +105,17 @@ GamepadManagerImpl::~GamepadManagerImpl() {
 bool GamepadManagerImpl::initialize() {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    // Initialize SDL2 first so we know which devices SDL has already
+    // claimed before we try to open them via raw HID. On Windows, both
+    // SDL's HIDAPI backend and our raw HID enumerator will happily open
+    // the same DualShock 4 / DualSense, fight over read/write access,
+    // and produce garbled or no input. Letting SDL win and skipping the
+    // raw HID path for PlayStation controllers avoids that race.
+    sdl_initialized_ = internal::initializeSDL();
+    if (sdl_initialized_) {
+        check_for_sdl_devices();
+    }
+
 #ifdef _WIN32
     auto hid_devices = internal::enumerate_hid_devices();
 
@@ -123,6 +134,19 @@ bool GamepadManagerImpl::initialize() {
         if (!is_supported_device(attributes.vendor_id, attributes.product_id)) {
             hid_device->close();
             continue;
+        }
+
+        // Skip PlayStation devices on Windows when SDL2 is active — SDL has
+        // already claimed them via HIDAPI and a second raw HID open would
+        // fight for shared read/write access (see comment in initialize()).
+        if (sdl_initialized_) {
+            auto ps_infos = internal::getPlayStationDeviceInfos();
+            if (std::any_of(ps_infos.begin(), ps_infos.end(), [&](const internal::PlayStationDeviceInfo& info) {
+                    return info.vendor_id == attributes.vendor_id && info.product_id == attributes.product_id;
+                })) {
+                hid_device->close();
+                continue;
+            }
         }
 
         int slot = find_available_slot();
@@ -156,12 +180,6 @@ bool GamepadManagerImpl::initialize() {
     //    check_for_dinput_devices();
     //}
 #endif
-
-    // Initialize SDL2 and scan for controllers (primary backend on Linux)
-    sdl_initialized_ = internal::initializeSDL();
-    if (sdl_initialized_) {
-        check_for_sdl_devices();
-    }
 
     hotplug_running_ = true;
     hotplug_thread_ = std::thread(&GamepadManagerImpl::hotplug_detection_loop, this);
@@ -319,6 +337,18 @@ void GamepadManagerImpl::check_for_new_devices() {
         if (!is_supported_device(attributes.vendor_id, attributes.product_id)) {
             hid_device->close();
             continue;
+        }
+
+        // Same SDL/raw-HID double-claim guard as initialize() — skip PS
+        // VID/PIDs on Windows when SDL is the active backend.
+        if (sdl_initialized_) {
+            auto ps_infos = internal::getPlayStationDeviceInfos();
+            if (std::any_of(ps_infos.begin(), ps_infos.end(), [&](const internal::PlayStationDeviceInfo& info) {
+                    return info.vendor_id == attributes.vendor_id && info.product_id == attributes.product_id;
+                })) {
+                hid_device->close();
+                continue;
+            }
         }
 
         int slot = find_available_slot();

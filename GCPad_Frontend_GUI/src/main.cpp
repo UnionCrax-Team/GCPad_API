@@ -36,6 +36,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #ifdef _WIN32
@@ -349,6 +350,7 @@ static std::string getForegroundProcessName() {
 
 #ifdef _WIN32
 struct TrayState {
+    bool           windowHidden = false;
     NOTIFYICONDATA nid{};
     HWND           hwnd = nullptr;
     bool           added = false;
@@ -390,7 +392,7 @@ static void trayShowContextMenu() {
     int cmd = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY, pt.x, pt.y, 0, g_tray.hwnd, nullptr);
     DestroyMenu(menu);
     if (cmd == TRAY_MENU_SHOW) {
-        SDL_ShowWindow(g_tray.sdlWin);
+        SDL_ShowWindow(g_tray.sdlWin); g_tray.windowHidden = false;
         SDL_RaiseWindow(g_tray.sdlWin);
     } else if (cmd == TRAY_MENU_QUIT) {
         SDL_Event ev{}; ev.type = SDL_QUIT;
@@ -404,7 +406,7 @@ static LRESULT CALLBACK TrayWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     if (msg == WM_TRAYICON) {
         if (LOWORD(lp) == WM_RBUTTONUP) trayShowContextMenu();
         if (LOWORD(lp) == WM_LBUTTONDBLCLK) {
-            SDL_ShowWindow(g_tray.sdlWin);
+            SDL_ShowWindow(g_tray.sdlWin); g_tray.windowHidden = false;
             SDL_RaiseWindow(g_tray.sdlWin);
         }
         return 0;
@@ -1062,8 +1064,14 @@ static void tabAbout() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 int main(int, char**) {
+    // Set the background-events hint *before* any SDL_Init so it's active
+    // when GCPad_Lib later does SDL_Init(SDL_INIT_JOYSTICK | GAMECONTROLLER).
+    // Don't init the joystick subsystem here — GCPad_Lib owns it. If we init
+    // it first without the hint having effect on a subsequent re-init, SDL
+    // will skip re-initialization and joystick events while the window is
+    // hidden / unfocused get suppressed.
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,"1");
-    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_JOYSTICK) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER) != 0) {
         fprintf(stderr,"SDL_Init: %s\n",SDL_GetError()); return 1;
     }
 
@@ -1129,7 +1137,7 @@ int main(int, char**) {
             if (ev.type == SDL_WINDOWEVENT) {
                 if (ev.window.event == SDL_WINDOWEVENT_CLOSE) {
 #ifdef _WIN32
-                    if (minimizeToTray) { SDL_HideWindow(window); }
+                    if (minimizeToTray) { SDL_HideWindow(window); g_tray.windowHidden = true; }
                     else running=false;
 #else
                     running=false;
@@ -1138,36 +1146,50 @@ int main(int, char**) {
             }
         }
 
-        mgr->updateAll();
-
-        // Input translation
-        auto* pad = mgr->getGamepad(activeSlot);
-        if (translating && pad && pad->isConnected()) {
-            remap.sendInput(pad->getState(), prevState);
-            prevState = pad->getState();
-        } else if (pad && pad->isConnected()) {
-            prevState = pad->getState();
-        }
-
-        // Auto-profile switching (check every 2 seconds)
+        // Always poll controllers and translate input — even when minimized
+        // to the tray. The whole point of tray mode is that remapping keeps
+        // working in the background. We just skip rendering work below when
+        // the window is hidden.
         {
-            auto now = std::chrono::steady_clock::now();
-            if (std::chrono::duration_cast<std::chrono::milliseconds>(now-lastAutoCheck).count() > 2000) {
-                lastAutoCheck = now;
-                std::string fg = getForegroundProcessName();
-                if (fg != lastFgProcess) {
-                    lastFgProcess = fg;
-                    for (int i=0;i<(int)profiles.size();++i) {
-                        if (!profiles[i].processMatch.empty() &&
-                            fg.find(profiles[i].processMatch) != std::string::npos) {
-                            activeProfile=i;
-                            applyProfileToRemapper(profiles[i],remap);
-                            break;
+            mgr->updateAll();
+
+            // Input translation
+            auto* pad = mgr->getGamepad(activeSlot);
+            if (translating && pad && pad->isConnected()) {
+                remap.sendInput(pad->getState(), prevState);
+                prevState = pad->getState();
+            } else if (pad && pad->isConnected()) {
+                prevState = pad->getState();
+            }
+
+            // Auto-profile switching (check every 2 seconds)
+            {
+                auto now = std::chrono::steady_clock::now();
+                if (std::chrono::duration_cast<std::chrono::milliseconds>(now-lastAutoCheck).count() > 2000) {
+                    lastAutoCheck = now;
+                    std::string fg = getForegroundProcessName();
+                    if (fg != lastFgProcess) {
+                        lastFgProcess = fg;
+                        for (int i=0;i<(int)profiles.size();++i) {
+                            if (!profiles[i].processMatch.empty() &&
+                                fg.find(profiles[i].processMatch) != std::string::npos) {
+                                activeProfile=i;
+                                applyProfileToRemapper(profiles[i],remap);
+                                break;
+                            }
                         }
                     }
                 }
             }
         }
+        // When hidden to tray, skip the ImGui+render work entirely and just
+        // sleep briefly so we don't burn CPU. Input polling above still runs.
+#ifdef _WIN32
+        if (g_tray.windowHidden) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(4));
+            continue;
+        }
+#endif
 
         // ImGui frame
         ImGui_ImplSDLRenderer2_NewFrame();

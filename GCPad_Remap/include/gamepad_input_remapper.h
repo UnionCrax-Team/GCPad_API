@@ -16,7 +16,10 @@
     #define GCPAD_REMAP_API __declspec(dllimport)
   #endif
 #else
-  #define GCPAD_REMAP_API
+  // The remap module is compiled into libgcpad.so, which on Linux is built
+  // with -fvisibility=hidden. Mark the public class with default visibility
+  // explicitly so frontends can link against these symbols.
+  #define GCPAD_REMAP_API __attribute__((visibility("default")))
 #endif
 
 namespace gcpad {

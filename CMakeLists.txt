@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.15)
 
-project(GCPad VERSION 1.0.0 LANGUAGES CXX RC)
+if(WIN32)
+    project(GCPad VERSION 1.0.0 LANGUAGES CXX RC)
+else()
+    project(GCPad VERSION 1.0.0 LANGUAGES CXX)
+endif()
 
 # Build order:
 #   1. GCPad_Lib    — Core library (gcpad.dll / libgcpad.so)

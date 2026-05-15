@@ -1,5 +1,7 @@
 #include "ps_device.h"
 #include "hid_device.h"
+#include <thread>
+#include <chrono>
 #include <iostream>
 #include <cstring>
 
@@ -130,8 +132,19 @@ bool PlayStationDevice::updateState() {
 
     std::vector<uint8_t> report;
     if (!hid_device_->read(report)) {
-        connected_ = false;
-        state_.is_connected = false;
+        // A single read failure is *not* enough to declare the device gone.
+        // Windows' overlapped HID read times out at ~100ms, which can happen
+        // any time the controller has nothing new to report (no buttons,
+        // sticks centered, no IMU motion above sensor noise). Only treat
+        // the device as disconnected if the underlying handle is actually
+        // closed -- otherwise just keep the last known state and try again
+        // next tick.
+        if (!hid_device_->is_open()) {
+            connected_ = false;
+            state_.is_connected = false;
+            return false;
+        }
+        // Keep last state, return false to signal "no fresh data" but stay alive.
         return false;
     }
 
@@ -222,11 +235,16 @@ bool PlayStationDevice::detect_device_type() {
 
     // DS4 v1 (0x05C4) is typically USB; DS4 v2 (0x09CC) can be either USB or BT.
     // DualSense (0x0CE6) can be either USB or BT.
-    // We distinguish USB vs BT by the input report length:
-    //   DS4 USB:  64 bytes    DS4 BT:  547 bytes (or report ID 0x11, ~78 bytes)
-    //   DS5 USB:  64 bytes    DS5 BT:  78 bytes (report ID 0x31)
-    // As a heuristic: if input report > 64 bytes, it's likely Bluetooth.
-    if (caps.input_report_byte_length > 64) {
+    // We distinguish USB vs BT by the input report length.
+    //
+    // NOTE: On Windows, HIDP_CAPS::InputReportByteLength includes the report
+    // ID byte. So a DS4 USB report (64 data bytes + 1 report-ID byte) shows
+    // up here as 65, not 64. The previous threshold of `> 64` was wrong --
+    // it misclassified every USB DS4 as Bluetooth, fed it to parse_ds4_bt(),
+    // which then rejected the report because report[0] was 0x01 instead of
+    // 0x11. Use `> 65` so USB stays USB and only true BT reports (78+ for
+    // DS4 simple, 547 for full BT, 78 for DualSense BT) get the BT path.
+    if (caps.input_report_byte_length > 65) {
         connection_type_ = ConnectionType::Bluetooth;
     } else {
         connection_type_ = ConnectionType::USB;
@@ -324,15 +342,23 @@ bool PlayStationDevice::parse_ds4_usb(const std::vector<uint8_t>& report) {
 }
 
 bool PlayStationDevice::parse_ds4_bt(const std::vector<uint8_t>& report) {
-    // DS4 Bluetooth: Report ID 0x11, 78+ bytes
+    // DS4 Bluetooth: Report ID 0x11 ("enhanced" mode), 78+ bytes
     // The data layout is the same as USB but shifted by +2 bytes:
     // Byte 0 = report ID (0x11)
     // Byte 1-2 = protocol header
     // Byte 3 = LX, 4 = LY, 5 = RX, 6 = RY
     // Byte 7 = buttons1, 8 = buttons2, 9 = PS/TP counter
     // Byte 10 = L2, 11 = R2
-    if (report.size() < 32) return false;
+    //
+    // Some DS4 firmwares / pairing states emit report ID 0x01 over BT in
+    // "simple" mode (no IMU, no touchpad). The first 10 bytes use the same
+    // layout as the USB 0x01 report, so we just hand it off there.
+    if (report.size() < 10) return false;
+    if (report[0] == 0x01) {
+        return parse_ds4_usb(report);
+    }
     if (report[0] != 0x11) return false;
+    if (report.size() < 32) return false;
 
     state_.setTimestamp(std::chrono::steady_clock::now());
     state_.is_connected = true;

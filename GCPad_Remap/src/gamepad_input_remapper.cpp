@@ -12,6 +12,18 @@
 #include <X11/Xutil.h>
 #include <X11/extensions/XTest.h>
 #include <X11/XKBlib.h>
+// X11 / Xi headers like to #define short names like None, Bool, Status,
+// Button1..5, COUNT, etc. that clobber our own enum members. Scrub the ones
+// that actually collide so the rest of this TU sees plain identifiers.
+#ifdef COUNT
+#undef COUNT
+#endif
+#ifdef None
+#undef None
+#endif
+#ifdef Status
+#undef Status
+#endif
 #endif
 
 namespace gcpad {
